@@ -16,8 +16,8 @@ Build a Go-based calendar notification daemon that monitors multiple calendars a
 
 ### Phase 3: Business Logic (Tasks 6-8)
 - [x] **Implement scheduling engine for event monitoring** - Event polling, upcoming meeting detection, timer management
-- [ ] **Create alarm processing logic** - Extract alarms from events, apply default intervals, calculate lead times
-- [ ] **Implement multi-calendar coordination** - Merge events from multiple sources, deduplicate, prioritize
+- [x] **Create alarm processing logic** - Extract alarms from events, apply default intervals, calculate lead times
+- [x] **Implement multi-calendar coordination** - Merge events from multiple sources, deduplicate, prioritize
 
 ### Phase 4: Application Assembly (Tasks 9-10)
 - [ ] **Create main application entry point** - CLI parsing, daemon setup, signal handling
