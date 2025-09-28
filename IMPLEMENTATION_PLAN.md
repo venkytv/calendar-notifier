@@ -11,7 +11,7 @@ Build a Go-based calendar notification daemon that monitors multiple calendars a
 - [x] **Implement abstract calendar interface** - Define Calendar interface for extensible provider support
 
 ### Phase 2: Core Integrations (Tasks 4-5)
-- [ ] **Implement Google Calendar API integration** - Google Calendar v3 API client, authentication, event fetching
+- [x] **Implement Google Calendar API integration** - Google Calendar v3 API client, authentication, event fetching
 - [ ] **Create NATS message publishing package** - NATS client setup, message formatting to calendar-siren spec
 
 ### Phase 3: Business Logic (Tasks 6-8)
