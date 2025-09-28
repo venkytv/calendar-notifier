@@ -13,7 +13,7 @@ type Provider interface {
 	// Name returns the human-readable name of the calendar provider
 	Name() string
 
-	// Type returns the provider type identifier (e.g., "google", "apple")
+	// Type returns the provider type identifier (e.g., "caldav", "ical")
 	Type() string
 
 	// Initialize sets up the calendar provider with the given credentials

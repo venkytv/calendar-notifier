@@ -12,12 +12,12 @@ nats:
 # Calendar provider configurations
 # You can configure multiple calendars from different providers
 calendars:
-  # CalDAV configuration (works with Google, Apple, Outlook, Nextcloud, etc.)
+  # CalDAV configuration (works with Apple, Outlook, Nextcloud, etc.)
   - name: "my-calendar"
     type: "caldav"
     # CalDAV server URL - see examples below for different providers
-    url: "https://calendar.google.com/calendar/dav/your-email@gmail.com/events"
-    username: "your-email@gmail.com"
+    url: "https://caldav.example.com/user/calendar/"
+    username: "your-username"
     password: "your-app-password"  # Use app password, not your main password!
     poll_interval: "5m"
 
@@ -37,13 +37,11 @@ calendars:
     password: "your-password"
     poll_interval: "5m"
 
-  # Example: Google Calendar with OAuth2 (alternative to CalDAV)
-  # - name: "google-oauth"
-  #   type: "google"
-  #   credentials: "/path/to/google-oauth-credentials.json"
-  #   calendar_ids:
-  #     - "primary"
-  #   poll_interval: "5m"
+  # Example: iCal URL (public calendars)
+  - name: "public-ical"
+    type: "ical"
+    url: "https://example.com/calendar.ics"
+    poll_interval: "10m"
 
 # Default notification settings
 defaults:

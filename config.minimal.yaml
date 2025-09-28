@@ -8,10 +8,10 @@ nats:
 calendars:
   - name: "my-calendar"
     type: "caldav"
-    # Google Calendar CalDAV URL (replace with your email)
-    url: "https://calendar.google.com/calendar/dav/your-email@gmail.com/events"
-    username: "your-email@gmail.com"
-    password: "your-app-password"  # Generate app password in Google Account settings
+    # CalDAV server URL (replace with your server details)
+    url: "https://caldav.example.com/user/calendar/"
+    username: "your-username"
+    password: "your-app-password"  # Use app-specific password
     poll_interval: "5m"
 
 defaults:

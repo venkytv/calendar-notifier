@@ -23,7 +23,6 @@ type NATSConfig struct {
 type CalendarConfig struct {
 	Name         string        `yaml:"name"`
 	Type         string        `yaml:"type"`
-	Credentials  string        `yaml:"credentials"` // For file-based credentials (Google API)
 	CalendarIDs  []string      `yaml:"calendar_ids"`
 	PollInterval time.Duration `yaml:"poll_interval"`
 
@@ -82,10 +81,6 @@ func (c *Config) validate() error {
 
 		// Validate based on calendar type
 		switch cal.Type {
-		case "google":
-			if cal.Credentials == "" {
-				return fmt.Errorf("calendar[%d]: credentials path is required for Google Calendar", i)
-			}
 		case "caldav":
 			if cal.URL == "" {
 				return fmt.Errorf("calendar[%d]: URL is required for CalDAV", i)

@@ -24,11 +24,10 @@ func DefaultCoordinatorConfig() *CoordinatorConfig {
 	return &CoordinatorConfig{
 		DeduplicationEnabled: true,
 		DeduplicationWindow:  5 * time.Minute,
-		PriorityProviders:    []string{"google", "outlook", "apple"},
+		PriorityProviders:    []string{"caldav", "ical"},
 		ProviderPriorities: map[string]int{
-			"google":  1,
-			"outlook": 2,
-			"apple":   3,
+			"caldav": 1,
+			"ical":   2,
 		},
 		MergeStrategies: map[string]string{
 			"default": "keep_first", // Default strategy

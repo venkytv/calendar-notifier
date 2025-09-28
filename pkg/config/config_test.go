@@ -19,8 +19,10 @@ nats:
 
 calendars:
   - name: "primary"
-    type: "google"
-    credentials: "/path/to/credentials.json"
+    type: "caldav"
+    url: "https://example.com/dav/user@example.com/calendar/"
+    username: "user@example.com"
+    password: "password"
     calendar_ids:
       - "primary"
     poll_interval: "5m"
@@ -81,9 +83,11 @@ func TestConfigValidation(t *testing.T) {
 				},
 				Calendars: []CalendarConfig{
 					{
-						Name:        "test",
-						Type:        "google",
-						Credentials: "/path/to/creds",
+						Name:     "test",
+						Type:     "caldav",
+						URL:      "https://example.com/dav/user@example.com/calendar/",
+						Username: "user@example.com",
+						Password: "password",
 					},
 				},
 			},
@@ -97,9 +101,11 @@ func TestConfigValidation(t *testing.T) {
 				},
 				Calendars: []CalendarConfig{
 					{
-						Name:        "test",
-						Type:        "google",
-						Credentials: "/path/to/creds",
+						Name:     "test",
+						Type:     "caldav",
+						URL:      "https://example.com/dav/user@example.com/calendar/",
+						Username: "user@example.com",
+						Password: "password",
 					},
 				},
 			},

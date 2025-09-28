@@ -129,11 +129,6 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		// Initialize provider based on type
 		ctx := context.Background()
 		switch calendarCfg.Type {
-		case "google":
-			if err := provider.Initialize(ctx, calendarCfg.Credentials); err != nil {
-				return nil, fmt.Errorf("failed to initialize %s provider: %w", calendarCfg.Name, err)
-			}
-
 		case "caldav":
 			// CalDAV providers need special initialization
 			caldavProvider, ok := provider.(*caldav.SimpleProvider)

@@ -24,8 +24,8 @@ func TestDefaultCoordinatorConfig(t *testing.T) {
 		t.Error("Expected some priority providers to be configured")
 	}
 
-	if config.ProviderPriorities["google"] != 1 {
-		t.Errorf("Expected Google to have priority 1, got %d", config.ProviderPriorities["google"])
+	if config.ProviderPriorities["caldav"] != 1 {
+		t.Errorf("Expected CalDAV to have priority 1, got %d", config.ProviderPriorities["caldav"])
 	}
 }
 
@@ -51,7 +51,7 @@ func TestCoordinateEventsNoDuplicates(t *testing.T) {
 			Title:        "Meeting 1",
 			StartTime:    now.Add(1 * time.Hour),
 			EndTime:      now.Add(2 * time.Hour),
-			CalendarName: "google",
+			CalendarName: "caldav",
 		},
 		{
 			ID:           "event2",
@@ -83,11 +83,11 @@ func TestDeduplicateEventsByTitle(t *testing.T) {
 	now := time.Now()
 	events := []*models.Event{
 		{
-			ID:           "google-event1",
+			ID:           "caldav-event1",
 			Title:        "Team Meeting",
 			StartTime:    now.Add(1 * time.Hour),
 			EndTime:      now.Add(2 * time.Hour),
-			CalendarName: "google",
+			CalendarName: "caldav",
 			Alarms: []models.Alarm{
 				{LeadTimeMinutes: 15, Method: "popup"},
 			},
@@ -114,12 +114,12 @@ func TestDeduplicateEventsByTitle(t *testing.T) {
 	}
 
 	merged := coordinated[0]
-	if merged.CalendarName != "google" { // Google has higher priority
-		t.Errorf("Expected merged event to use Google calendar name, got %s", merged.CalendarName)
+	if merged.CalendarName != "caldav" { // CalDAV has higher priority
+		t.Errorf("Expected merged event to use CalDAV calendar name, got %s", merged.CalendarName)
 	}
 
 	// Check that it has a merged ID
-	if merged.ID != "merged-google-event1-outlook-event1" {
+	if merged.ID != "merged-caldav-event1-outlook-event1" {
 		t.Errorf("Expected merged ID, got %s", merged.ID)
 	}
 }
@@ -129,7 +129,7 @@ func TestDeduplicateEventsWithMergeAlarmsStrategy(t *testing.T) {
 		DeduplicationEnabled: true,
 		DeduplicationWindow:  5 * time.Minute,
 		ProviderPriorities: map[string]int{
-			"google":  1,
+			"caldav":  1,
 			"outlook": 2,
 		},
 		MergeStrategies: map[string]string{
@@ -142,11 +142,11 @@ func TestDeduplicateEventsWithMergeAlarmsStrategy(t *testing.T) {
 	now := time.Now()
 	events := []*models.Event{
 		{
-			ID:           "google-event1",
+			ID:           "caldav-event1",
 			Title:        "Team Meeting",
 			StartTime:    now.Add(1 * time.Hour),
 			EndTime:      now.Add(2 * time.Hour),
-			CalendarName: "google",
+			CalendarName: "caldav",
 			Alarms: []models.Alarm{
 				{LeadTimeMinutes: 15, Method: "popup", Severity: "normal"},
 			},
@@ -187,7 +187,7 @@ func TestDeduplicateEventsWithMergeAlarmsStrategy(t *testing.T) {
 func TestPrioritizeEventsByProvider(t *testing.T) {
 	config := &CoordinatorConfig{
 		ProviderPriorities: map[string]int{
-			"google":  1, // Highest priority
+			"caldav":  1, // Highest priority
 			"outlook": 2,
 			"apple":   3,
 		},
@@ -204,10 +204,10 @@ func TestPrioritizeEventsByProvider(t *testing.T) {
 			CalendarName: "apple",
 		},
 		{
-			ID:           "google-event",
-			Title:        "Google Meeting",
+			ID:           "caldav-event",
+			Title:        "CalDAV Meeting",
 			StartTime:    now.Add(1 * time.Hour),
-			CalendarName: "google",
+			CalendarName: "caldav",
 		},
 		{
 			ID:           "outlook-event",
@@ -219,9 +219,9 @@ func TestPrioritizeEventsByProvider(t *testing.T) {
 
 	coordinator.prioritizeEventsByProvider(events)
 
-	// Should be sorted by priority: Google (1), Outlook (2), Apple (3)
-	if events[0].CalendarName != "google" {
-		t.Errorf("Expected Google event first, got %s", events[0].CalendarName)
+	// Should be sorted by priority: CalDAV (1), Outlook (2), Apple (3)
+	if events[0].CalendarName != "caldav" {
+		t.Errorf("Expected CalDAV event first, got %s", events[0].CalendarName)
 	}
 	if events[1].CalendarName != "outlook" {
 		t.Errorf("Expected Outlook event second, got %s", events[1].CalendarName)
@@ -333,13 +333,13 @@ func TestGetCoordinationStats(t *testing.T) {
 
 	now := time.Now()
 	originalEvents := []*models.Event{
-		{ID: "1", Title: "Meeting A", CalendarName: "google", StartTime: now},
+		{ID: "1", Title: "Meeting A", CalendarName: "caldav", StartTime: now},
 		{ID: "2", Title: "Meeting A", CalendarName: "outlook", StartTime: now}, // Duplicate
 		{ID: "3", Title: "Meeting B", CalendarName: "apple", StartTime: now},
 	}
 
 	coordinatedEvents := []*models.Event{
-		{ID: "merged-1-2", Title: "Meeting A", CalendarName: "google", StartTime: now},
+		{ID: "merged-1-2", Title: "Meeting A", CalendarName: "caldav", StartTime: now},
 		{ID: "3", Title: "Meeting B", CalendarName: "apple", StartTime: now},
 	}
 
@@ -357,8 +357,8 @@ func TestGetCoordinationStats(t *testing.T) {
 		t.Errorf("Expected 1 duplicate removed, got %d", stats.DuplicatesRemoved)
 	}
 
-	if stats.ProviderCounts["google"] != 1 {
-		t.Errorf("Expected 1 Google event, got %d", stats.ProviderCounts["google"])
+	if stats.ProviderCounts["caldav"] != 1 {
+		t.Errorf("Expected 1 CalDAV event, got %d", stats.ProviderCounts["caldav"])
 	}
 
 	if stats.ProviderCounts["apple"] != 1 {
@@ -370,7 +370,7 @@ func TestCoordinateEventsDisabledDeduplication(t *testing.T) {
 	config := &CoordinatorConfig{
 		DeduplicationEnabled: false, // Disabled
 		ProviderPriorities: map[string]int{
-			"google": 1,
+			"caldav": 1,
 		},
 	}
 
@@ -382,7 +382,7 @@ func TestCoordinateEventsDisabledDeduplication(t *testing.T) {
 			ID:           "event1",
 			Title:        "Team Meeting",
 			StartTime:    now.Add(1 * time.Hour),
-			CalendarName: "google",
+			CalendarName: "caldav",
 		},
 		{
 			ID:           "event2",
@@ -418,7 +418,7 @@ func BenchmarkCoordinateEvents(b *testing.B) {
 				Title:        fmt.Sprintf("Meeting %d", i%20), // Some duplicate titles
 				StartTime:    now.Add(time.Duration(i) * time.Minute),
 				EndTime:      now.Add(time.Duration(i+60) * time.Minute),
-				CalendarName: []string{"google", "outlook", "apple"}[i%3],
+				CalendarName: []string{"caldav", "outlook", "apple"}[i%3],
 			})
 	}
 
