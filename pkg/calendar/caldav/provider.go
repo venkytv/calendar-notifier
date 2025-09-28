@@ -11,6 +11,7 @@ import (
 	"github.com/venkytv/calendar-notifier/internal/models"
 	calendarPkg "github.com/venkytv/calendar-notifier/pkg/calendar"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/ical"
+	"github.com/venkytv/calendar-notifier/pkg/retry"
 )
 
 // Config holds CalDAV provider configuration
@@ -28,16 +29,45 @@ type SimpleProvider struct {
 	password string
 	client   *http.Client
 	logger   *slog.Logger
+	retryer  *retry.Retryer
 }
 
 // NewSimpleProvider creates a new simple CalDAV provider
 func NewSimpleProvider() *SimpleProvider {
+	logger := slog.Default()
+
+	// Configure retry with sensible defaults for CalDAV
+	retryConfig := &retry.Config{
+		MaxAttempts:   3,
+		InitialDelay:  2 * time.Second,
+		MaxDelay:      30 * time.Second,
+		BackoffFactor: 2.0,
+		Jitter:        true,
+		RetriableStatuses: []int{
+			http.StatusRequestTimeout,      // 408
+			http.StatusTooManyRequests,     // 429
+			http.StatusInternalServerError, // 500
+			http.StatusBadGateway,          // 502
+			http.StatusServiceUnavailable,  // 503
+			http.StatusGatewayTimeout,      // 504
+		},
+		RetriableErrors: []string{
+			"connection refused",
+			"timeout",
+			"temporary failure",
+			"network unreachable",
+			"no such host",
+			"connection reset",
+		},
+	}
+
 	return &SimpleProvider{
 		name: "CalDAV",
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		logger: slog.Default(),
+		logger:  logger,
+		retryer: retry.NewRetryer(retryConfig, logger),
 	}
 }
 
@@ -55,6 +85,31 @@ func (p *SimpleProvider) Type() string {
 func (p *SimpleProvider) SetLogger(logger *slog.Logger) {
 	if logger != nil {
 		p.logger = logger
+		// Update retryer with new logger
+		retryConfig := &retry.Config{
+			MaxAttempts:   3,
+			InitialDelay:  2 * time.Second,
+			MaxDelay:      30 * time.Second,
+			BackoffFactor: 2.0,
+			Jitter:        true,
+			RetriableStatuses: []int{
+				http.StatusRequestTimeout,      // 408
+				http.StatusTooManyRequests,     // 429
+				http.StatusInternalServerError, // 500
+				http.StatusBadGateway,          // 502
+				http.StatusServiceUnavailable,  // 503
+				http.StatusGatewayTimeout,      // 504
+			},
+			RetriableErrors: []string{
+				"connection refused",
+				"timeout",
+				"temporary failure",
+				"network unreachable",
+				"no such host",
+				"connection reset",
+			},
+		}
+		p.retryer = retry.NewRetryer(retryConfig, logger)
 	}
 }
 
@@ -104,33 +159,61 @@ func (p *SimpleProvider) GetEvents(ctx context.Context, calendarIDs []string, fr
 	return events, nil
 }
 
-// fetchICalData retrieves iCal data from the CalDAV server
+// fetchICalData retrieves iCal data from the CalDAV server with retry logic
 func (p *SimpleProvider) fetchICalData(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", p.url, nil)
+	operation := func() (interface{}, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", p.url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %v", err)
+		}
+
+		// Add basic authentication
+		req.SetBasicAuth(p.username, p.password)
+		req.Header.Set("Accept", "text/calendar")
+		req.Header.Set("User-Agent", "calendar-notifier/1.0")
+
+		p.logger.Debug("Fetching CalDAV data", "url", p.url, "username", p.username)
+
+		resp, err := p.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("HTTP request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			// Create HTTP error for proper retry classification
+			httpErr := retry.NewHTTPError(resp.StatusCode, resp.Status, p.url)
+			p.logger.Warn("HTTP error when fetching CalDAV data",
+				"url", p.url,
+				"username", p.username,
+				"status_code", resp.StatusCode,
+				"status", resp.Status)
+			return nil, httpErr
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response body: %v", err)
+		}
+
+		p.logger.Debug("Successfully fetched CalDAV data",
+			"url", p.url,
+			"username", p.username,
+			"content_length", len(body))
+
+		return string(body), nil
+	}
+
+	result, err := p.retryer.DoWithResult(ctx, operation)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
+		p.logger.Error("Failed to fetch CalDAV data after retries",
+			"url", p.url,
+			"username", p.username,
+			"error", err)
+		return "", err
 	}
 
-	// Add basic authentication
-	req.SetBasicAuth(p.username, p.password)
-	req.Header.Set("Accept", "text/calendar")
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("HTTP request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return string(body), nil
+	return result.(string), nil
 }
 
 // GetCalendars returns a basic calendar list (simplified for this provider)

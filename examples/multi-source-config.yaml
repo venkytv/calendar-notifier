@@ -1,0 +1,52 @@
+# Multi-source calendar configuration
+# This example shows how to monitor multiple calendar sources simultaneously
+
+# NATS configuration for publishing notifications
+nats:
+  url: "nats://prod-nats.company.com:4222"
+  subject: "calendar.alerts"
+
+# Multiple calendar sources with different configurations
+calendars:
+  # Personal Google Calendar via iCal export
+  - name: "personal-google"
+    type: "ical"
+    url: "https://calendar.google.com/calendar/ical/your-email%40gmail.com/private-key/basic.ics"
+    poll_interval: "15m"
+    calendar_ids: []
+
+  # Work Outlook via CalDAV
+  - name: "work-outlook"
+    type: "caldav"
+    url: "https://outlook.office365.com/api/v2.0/me/calendars"
+    username: "work-email@company.com"
+    password: "app-specific-password"
+    poll_interval: "5m"
+    calendar_ids: []
+
+  # Shared team calendar
+  - name: "team-events"
+    type: "caldav"
+    url: "https://caldav.company.com/calendars/team/events/"
+    username: "service-account"
+    password: "service-password"
+    poll_interval: "10m"
+    calendar_ids: []
+
+  # Public holiday calendar
+  - name: "holidays"
+    type: "ical"
+    url: "https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics"
+    poll_interval: "1h"
+    calendar_ids: []
+
+# Flexible notification settings
+defaults:
+  # Multiple notification intervals for different reminder needs
+  notification_intervals: [10, 30, 120]  # 10 min, 30 min, 2 hours
+  default_severity: "normal"
+
+# Production logging settings
+logging:
+  level: "info"
+  format: "json"

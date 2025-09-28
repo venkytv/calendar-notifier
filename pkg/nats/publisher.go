@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/venkytv/calendar-notifier/internal/models"
+	"github.com/venkytv/calendar-notifier/pkg/retry"
 )
 
 // Publisher handles publishing calendar notifications to NATS
@@ -17,6 +18,7 @@ type Publisher struct {
 	conn    *nats.Conn
 	subject string
 	logger  *slog.Logger
+	retryer *retry.Retryer
 }
 
 // Config holds NATS publisher configuration
@@ -87,10 +89,25 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 
 	logger.Info("Successfully connected to NATS", "url", config.URL, "servers", conn.Servers())
 
+	// Configure retry for NATS operations
+	retryConfig := &retry.Config{
+		MaxAttempts:   3,
+		InitialDelay:  100 * time.Millisecond,
+		MaxDelay:      2 * time.Second,
+		BackoffFactor: 2.0,
+		Jitter:        true,
+		RetriableErrors: []string{
+			"connection closed",
+			"no servers available",
+			"timeout",
+		},
+	}
+
 	publisher := &Publisher{
 		conn:    conn,
 		subject: config.Subject,
 		logger:  logger,
+		retryer: retry.NewRetryer(retryConfig, logger),
 	}
 
 	logger.Info("NATS publisher initialized",
@@ -101,27 +118,50 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 	return publisher, nil
 }
 
-// PublishNotification publishes a single calendar notification to NATS
+// PublishNotification publishes a single calendar notification to NATS with retry logic
 func (p *Publisher) PublishNotification(ctx context.Context, notification *models.Notification) error {
 	if p.conn == nil || p.conn.IsClosed() {
 		return fmt.Errorf("NATS connection is not available")
 	}
 
-	// Marshal notification to JSON
+	// Marshal notification to JSON once
 	data, err := json.Marshal(notification)
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification: %v", err)
 	}
 
-	// Publish to NATS with context timeout
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		err = p.conn.Publish(p.subject, data)
+	operation := func() error {
+		// Check context before each retry attempt
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Check connection health before publishing
+		if p.conn.IsClosed() {
+			return fmt.Errorf("NATS connection is closed")
+		}
+
+		err := p.conn.Publish(p.subject, data)
 		if err != nil {
+			p.logger.Warn("Failed to publish notification, will retry",
+				"subject", p.subject,
+				"title", notification.Title,
+				"error", err)
 			return fmt.Errorf("failed to publish notification: %v", err)
 		}
+
+		return nil
+	}
+
+	err = p.retryer.Do(ctx, operation)
+	if err != nil {
+		p.logger.Error("Failed to publish notification after retries",
+			"subject", p.subject,
+			"title", notification.Title,
+			"error", err)
+		return err
 	}
 
 	p.logger.Debug("Published notification",

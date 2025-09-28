@@ -68,20 +68,50 @@ func main() {
 
 	app.logger.Info("Calendar notifier started successfully")
 
-	// Wait for shutdown signal
-	sig := <-sigChan
-	app.logger.Info("Received shutdown signal", "signal", sig)
+	// Wait for shutdown signal or application error
+	select {
+	case sig := <-sigChan:
+		app.logger.Info("Received shutdown signal", "signal", sig)
 
-	// Graceful shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), gracefulTimeout)
-	defer shutdownCancel()
+		// Cancel the main context to stop all services
+		cancel()
 
-	if err := app.Stop(shutdownCtx); err != nil {
-		app.logger.Error("Error during shutdown", "error", err)
-		os.Exit(1)
+		// Graceful shutdown with timeout
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), gracefulTimeout)
+		defer shutdownCancel()
+
+		app.logger.Info("Starting graceful shutdown", "timeout", gracefulTimeout)
+
+		// Create a channel to receive shutdown completion
+		shutdownDone := make(chan error, 1)
+		go func() {
+			shutdownDone <- app.Stop(shutdownCtx)
+		}()
+
+		// Wait for either successful shutdown or timeout
+		select {
+		case err := <-shutdownDone:
+			if err != nil {
+				app.logger.Error("Error during graceful shutdown", "error", err)
+				os.Exit(1)
+			}
+			app.logger.Info("Calendar notifier stopped gracefully")
+
+		case <-shutdownCtx.Done():
+			app.logger.Error("Graceful shutdown timed out", "timeout", gracefulTimeout)
+			app.logger.Info("Attempting force shutdown")
+			// Force shutdown by exiting - OS will clean up resources
+			os.Exit(1)
+		}
+
+	case <-ctx.Done():
+		// Context was cancelled (shouldn't normally happen)
+		app.logger.Info("Main context cancelled")
+		if err := app.Stop(context.Background()); err != nil {
+			app.logger.Error("Error during shutdown", "error", err)
+			os.Exit(1)
+		}
 	}
-
-	app.logger.Info("Calendar notifier stopped gracefully")
 }
 
 // App holds the main application components
@@ -227,23 +257,44 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) Stop(ctx context.Context) error {
 	a.logger.Info("Shutting down application")
 
-	// Stop event scheduler
+	var shutdownErrors []error
+
+	// Stop event scheduler first (most critical component)
+	a.logger.Info("Stopping event scheduler")
 	if err := a.eventScheduler.Stop(); err != nil {
 		a.logger.Error("Error stopping event scheduler", "error", err)
+		shutdownErrors = append(shutdownErrors, err)
+	} else {
+		a.logger.Info("Event scheduler stopped successfully")
 	}
 
-	// Close NATS publisher
+	// Close NATS publisher (flush any pending messages)
 	if a.natsPublisher != nil && !a.dryRun {
+		a.logger.Info("Closing NATS publisher")
 		if err := a.natsPublisher.Close(); err != nil {
 			a.logger.Error("Error closing NATS publisher", "error", err)
+			shutdownErrors = append(shutdownErrors, err)
+		} else {
+			a.logger.Info("NATS publisher closed successfully")
 		}
 	}
 
-	// Close calendar manager
+	// Close calendar manager and all providers
+	a.logger.Info("Closing calendar manager")
 	if err := a.calendarManager.Close(); err != nil {
 		a.logger.Error("Error closing calendar manager", "error", err)
+		shutdownErrors = append(shutdownErrors, err)
+	} else {
+		a.logger.Info("Calendar manager closed successfully")
 	}
 
+	// Log final shutdown status
+	if len(shutdownErrors) > 0 {
+		a.logger.Error("Shutdown completed with errors", "error_count", len(shutdownErrors))
+		return fmt.Errorf("shutdown completed with %d errors", len(shutdownErrors))
+	}
+
+	a.logger.Info("All services stopped successfully")
 	return nil
 }
 
@@ -252,11 +303,15 @@ func (a *App) runCleanupRoutine(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Hour) // Clean up every hour
 	defer ticker.Stop()
 
+	a.logger.Info("Starting cleanup routine", "interval", "1h")
+
 	for {
 		select {
 		case <-ctx.Done():
+			a.logger.Info("Cleanup routine stopping due to context cancellation")
 			return
 		case <-ticker.C:
+			a.logger.Debug("Running periodic cleanup of old events")
 			a.eventScheduler.CleanupOldEvents()
 		}
 	}

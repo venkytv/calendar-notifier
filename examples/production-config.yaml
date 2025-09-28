@@ -1,0 +1,54 @@
+# Production environment configuration
+# This example shows a robust production setup with multiple redundancy measures
+
+# Production NATS cluster configuration
+nats:
+  url: "nats://nats1.prod.company.com:4222,nats2.prod.company.com:4222,nats3.prod.company.com:4222"
+  subject: "production.calendar.notifications"
+
+# Production calendar sources with staggered polling
+calendars:
+  # Primary corporate calendar
+  - name: "corporate-calendar"
+    type: "caldav"
+    url: "https://caldav.corporate.company.com/calendars/notifications/"
+    username: "calendar-service"
+    password: "${CALDAV_PASSWORD}"  # Environment variable for security
+    poll_interval: "3m"
+    calendar_ids: []
+
+  # Executive calendar with higher priority
+  - name: "executive-calendar"
+    type: "caldav"
+    url: "https://caldav.corporate.company.com/calendars/executives/"
+    username: "calendar-service"
+    password: "${CALDAV_PASSWORD}"
+    poll_interval: "1m"  # More frequent polling for executive events
+    calendar_ids: []
+
+  # Company-wide announcements
+  - name: "announcements"
+    type: "ical"
+    url: "https://intranet.company.com/calendar/announcements.ics"
+    poll_interval: "30m"  # Less frequent for announcements
+    calendar_ids: []
+
+  # Emergency/incident calendar
+  - name: "incidents"
+    type: "caldav"
+    url: "https://caldav.corporate.company.com/calendars/incidents/"
+    username: "calendar-service"
+    password: "${CALDAV_PASSWORD}"
+    poll_interval: "30s"  # Very frequent for incident notifications
+    calendar_ids: []
+
+# Production-grade notification settings
+defaults:
+  # Comprehensive notification intervals for different urgency levels
+  notification_intervals: [5, 15, 30, 60, 120]  # 5min, 15min, 30min, 1hr, 2hr
+  default_severity: "normal"
+
+# Production logging - structured and efficient
+logging:
+  level: "info"        # Balance between visibility and performance
+  format: "json"       # Structured logs for log aggregation systems

@@ -1,0 +1,36 @@
+# Development environment configuration
+# This example is optimized for local development and testing
+
+# Local NATS server for development
+nats:
+  url: "nats://localhost:4222"
+  subject: "dev.calendar.notifications"
+
+# Test calendar sources
+calendars:
+  # Local test iCal file server
+  - name: "test-calendar"
+    type: "ical"
+    url: "http://localhost:8080/test-calendar.ics"
+    poll_interval: "30s"  # Frequent polling for testing
+    calendar_ids: []
+
+  # Mock CalDAV server for testing
+  - name: "mock-caldav"
+    type: "caldav"
+    url: "http://localhost:8081/caldav/testuser/"
+    username: "testuser"
+    password: "testpass"
+    poll_interval: "1m"
+    calendar_ids: []
+
+# Aggressive notification settings for testing
+defaults:
+  # Short intervals for immediate feedback during development
+  notification_intervals: [1, 5]  # 1 min, 5 min
+  default_severity: "low"
+
+# Verbose logging for development
+logging:
+  level: "debug"
+  format: "text"  # Human-readable format for development

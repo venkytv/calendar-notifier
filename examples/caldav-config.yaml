@@ -1,0 +1,36 @@
+# CalDAV configuration example
+# This example shows how to configure calendar-notifier with CalDAV servers
+
+# NATS configuration for publishing notifications
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+
+# Calendar sources to monitor
+calendars:
+  - name: "work-calendar"
+    type: "caldav"
+    url: "https://caldav.example.com/calendars/user@example.com/work/"
+    username: "user@example.com"
+    password: "your-caldav-password"
+    poll_interval: "2m"
+    calendar_ids: []
+
+  - name: "shared-calendar"
+    type: "caldav"
+    url: "https://caldav.example.com/calendars/shared/team/"
+    username: "user@example.com"
+    password: "your-caldav-password"
+    poll_interval: "10m"
+    calendar_ids: []
+
+# Default notification settings
+defaults:
+  # Aggressive notification intervals for work environment
+  notification_intervals: [5, 15, 30, 60]
+  default_severity: "high"
+
+# Enhanced logging for troubleshooting
+logging:
+  level: "debug"
+  format: "json"

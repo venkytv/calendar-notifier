@@ -1,0 +1,13 @@
+# Minimal configuration example
+# This shows the absolute minimum required configuration
+
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+
+calendars:
+  - name: "my-calendar"
+    type: "ical"
+    url: "https://example.com/calendar.ics"
+
+# All other settings will use defaults

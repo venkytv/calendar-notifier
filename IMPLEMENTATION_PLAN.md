@@ -24,11 +24,11 @@ Build a Go-based calendar notification daemon that monitors multiple calendars a
 - [x] **Add comprehensive logging with structured JSON** - Structured logging with log/slog for debugging and monitoring
 
 ### Phase 5: Quality & Reliability (Tasks 11-15)
-- [ ] **Create unit tests for all packages** - Test coverage for calendar, NATS, scheduler, config packages
-- [ ] **Add integration tests for calendar providers** - End-to-end tests with mock calendar APIs
-- [ ] **Create example configuration files** - Sample YAML configs for different deployment scenarios
-- [ ] **Add graceful shutdown handling** - SIGTERM/SIGINT handling, cleanup routines
-- [ ] **Implement error handling and retry logic** - Network failures, API rate limits, connection recovery
+- [x] **Create unit tests for all packages** - Test coverage for calendar, NATS, scheduler, config packages
+- [x] **Add integration tests for calendar providers** - End-to-end tests with mock calendar APIs
+- [x] **Create example configuration files** - Sample YAML configs for different deployment scenarios
+- [x] **Add graceful shutdown handling** - SIGTERM/SIGINT handling, cleanup routines
+- [x] **Implement error handling and retry logic** - Network failures, API rate limits, connection recovery
 
 ## NATS Message Contract
 ```json
