@@ -2,6 +2,7 @@ package ical
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,7 +12,10 @@ import (
 )
 
 // ParseICalData parses iCal data using the arran4/golang-ical library
-func ParseICalData(icalData string, calendarID, calendarName string, from, to time.Time) ([]*models.Event, error) {
+func ParseICalData(icalData string, calendarID, calendarName string, from, to time.Time, logger *slog.Logger) ([]*models.Event, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	// Parse iCal data using arran4/golang-ical
 	calendar, err := ics.ParseCalendar(strings.NewReader(icalData))
 	if err != nil {
@@ -22,9 +26,9 @@ func ParseICalData(icalData string, calendarID, calendarName string, from, to ti
 
 	// Process each event in the calendar
 	for _, event := range calendar.Events() {
-		internalEvent, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName)
+		internalEvent, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
 		if err != nil {
-			fmt.Printf("Warning: failed to convert event: %v\n", err)
+			logger.Warn("Failed to convert iCal event", "error", err, "calendar_id", calendarID)
 			continue
 		}
 
@@ -38,7 +42,10 @@ func ParseICalData(icalData string, calendarID, calendarName string, from, to ti
 }
 
 // ConvertICSEventToInternalEvent converts an ics.VEvent to our internal Event model
-func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName string) (*models.Event, error) {
+func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName string, logger *slog.Logger) (*models.Event, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	internalEvent := &models.Event{
 		CalendarID:   calendarID,
 		CalendarName: calendarName,
@@ -82,9 +89,9 @@ func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName 
 
 	// Extract alarms using the library's methods
 	for _, alarm := range event.Alarms() {
-		internalAlarm, err := ConvertICSAlarmToInternalAlarm(alarm)
+		internalAlarm, err := ConvertICSAlarmToInternalAlarm(alarm, event, calendarID, logger)
 		if err != nil {
-			fmt.Printf("Warning: failed to convert alarm: %v\n", err)
+			logger.Warn("Failed to convert iCal alarm", "error", err, "event_id", internalEvent.ID, "calendar_id", calendarID)
 			continue
 		}
 		internalEvent.Alarms = append(internalEvent.Alarms, *internalAlarm)
@@ -102,7 +109,10 @@ func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName 
 }
 
 // ConvertICSAlarmToInternalAlarm converts an ics.VAlarm to our internal Alarm model
-func ConvertICSAlarmToInternalAlarm(alarm *ics.VAlarm) (*models.Alarm, error) {
+func ConvertICSAlarmToInternalAlarm(alarm *ics.VAlarm, event *ics.VEvent, calendarID string, logger *slog.Logger) (*models.Alarm, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	internalAlarm := &models.Alarm{
 		Method:   "popup", // Default
 		Severity: "normal", // Default
@@ -121,13 +131,13 @@ func ConvertICSAlarmToInternalAlarm(alarm *ics.VAlarm) (*models.Alarm, error) {
 		if len(triggerValue) > 10 && (triggerValue[8] == 'T' || triggerValue[len(triggerValue)-1] == 'Z') {
 			// This is an absolute trigger time - we can't calculate lead time without event context
 			// For now, use a default lead time
-			fmt.Printf("Warning: absolute trigger times not fully supported, using default lead time for '%s'\n", triggerValue)
+			logger.Warn("Absolute trigger times not fully supported, using default lead time", "trigger_value", triggerValue, "event_id", event.Id(), "calendar_id", calendarID)
 			internalAlarm.LeadTimeMinutes = 15 // Default
 		} else {
 			// Parse iCal duration format (e.g., "-P0DT0H5M0S", "-PT15M")
 			duration, err := parseICalDuration(triggerValue)
 			if err != nil {
-				fmt.Printf("Warning: failed to parse trigger duration '%s', using default: %v\n", triggerValue, err)
+				logger.Warn("Failed to parse trigger duration, using default", "trigger_value", triggerValue, "error", err, "event_id", event.Id(), "calendar_id", calendarID)
 				internalAlarm.LeadTimeMinutes = 15 // Default
 			} else {
 				// Convert to positive minutes (scheduler expects positive lead times)

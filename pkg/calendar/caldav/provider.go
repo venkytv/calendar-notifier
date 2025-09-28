@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -26,6 +27,7 @@ type SimpleProvider struct {
 	username string
 	password string
 	client   *http.Client
+	logger   *slog.Logger
 }
 
 // NewSimpleProvider creates a new simple CalDAV provider
@@ -35,6 +37,7 @@ func NewSimpleProvider() *SimpleProvider {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		logger: slog.Default(),
 	}
 }
 
@@ -46,6 +49,13 @@ func (p *SimpleProvider) Name() string {
 // Type returns the provider type identifier
 func (p *SimpleProvider) Type() string {
 	return "caldav"
+}
+
+// SetLogger sets the logger for this provider
+func (p *SimpleProvider) SetLogger(logger *slog.Logger) {
+	if logger != nil {
+		p.logger = logger
+	}
 }
 
 // Initialize sets up the CalDAV provider with credentials file (not used for CalDAV)
@@ -86,7 +96,7 @@ func (p *SimpleProvider) GetEvents(ctx context.Context, calendarIDs []string, fr
 	}
 
 	// Parse iCal data using shared parser
-	events, err := ical.ParseICalData(icalData, p.url, "CalDAV Calendar", from, to)
+	events, err := ical.ParseICalData(icalData, p.url, "CalDAV Calendar", from, to, p.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iCal data: %v", err)
 	}

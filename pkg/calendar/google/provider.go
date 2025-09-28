@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,12 +26,14 @@ type Provider struct {
 	service         *calendar.Service
 	oauth2Config    *oauth2.Config
 	tokenPath       string
+	logger          *slog.Logger
 }
 
 // NewProvider creates a new Google Calendar provider
 func NewProvider() *Provider {
 	return &Provider{
-		name: "Google Calendar",
+		name:   "Google Calendar",
+		logger: slog.Default(),
 	}
 }
 
@@ -42,6 +45,13 @@ func (p *Provider) Name() string {
 // Type returns the provider type identifier
 func (p *Provider) Type() string {
 	return "google"
+}
+
+// SetLogger sets the logger for this provider
+func (p *Provider) SetLogger(logger *slog.Logger) {
+	if logger != nil {
+		p.logger = logger
+	}
 }
 
 // Initialize sets up the Google Calendar provider with credentials
@@ -149,10 +159,13 @@ func (p *Provider) GetCalendars(ctx context.Context) ([]*calendarPkg.Calendar, e
 
 	// Log calendar access for debugging
 	if len(calendarList.Items) == 0 {
-		fmt.Printf("WARNING: Service account has access to 0 calendars. This usually means:\n")
-		fmt.Printf("  1. No calendars are shared with the service account email, OR\n")
-		fmt.Printf("  2. You need to use OAuth2 client credentials instead of service account\n")
-		fmt.Printf("  3. Service account email: check 'client_email' field in your credentials JSON\n")
+		p.logger.Warn("Service account has access to 0 calendars",
+			"provider", p.name,
+			"possible_causes", []string{
+				"No calendars are shared with the service account email",
+				"You need to use OAuth2 client credentials instead of service account",
+				"Check service account email in 'client_email' field of credentials JSON",
+			})
 	}
 
 	var calendars []*calendarPkg.Calendar
@@ -238,7 +251,7 @@ func (p *Provider) saveToken(token *oauth2.Token) error {
 // authorizeNewToken performs OAuth2 authorization flow
 func (p *Provider) authorizeNewToken(ctx context.Context) (*oauth2.Token, error) {
 	authURL := p.oauth2Config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("\nGo to the following link in your browser:\n%v\n\n", authURL)
+	p.logger.Info("OAuth2 authorization required", "auth_url", authURL)
 	fmt.Print("Enter the authorization code: ")
 
 	var authCode string
@@ -253,7 +266,7 @@ func (p *Provider) authorizeNewToken(ctx context.Context) (*oauth2.Token, error)
 
 	// Save token for future use
 	if err := p.saveToken(token); err != nil {
-		fmt.Printf("Warning: unable to save token: %v\n", err)
+		p.logger.Warn("Unable to save OAuth2 token", "error", err, "token_path", p.tokenPath)
 	}
 
 	return token, nil

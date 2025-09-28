@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ type Provider struct {
 	name   string
 	url    string
 	client *http.Client
+	logger *slog.Logger
 }
 
 // NewProvider creates a new iCal provider using arran4/golang-ical
@@ -25,6 +27,7 @@ func NewProvider() *Provider {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		logger: slog.Default(),
 	}
 }
 
@@ -38,6 +41,13 @@ func (p *Provider) Type() string {
 	return "ical"
 }
 
+// SetLogger sets the logger for this provider
+func (p *Provider) SetLogger(logger *slog.Logger) {
+	if logger != nil {
+		p.logger = logger
+	}
+}
+
 // Initialize sets up the iCal provider with the URL
 func (p *Provider) Initialize(ctx context.Context, url string) error {
 	if url == "" {
@@ -45,6 +55,7 @@ func (p *Provider) Initialize(ctx context.Context, url string) error {
 	}
 
 	p.url = url
+	p.logger.Info("Initialized iCal provider", "url", url)
 	return nil
 }
 
@@ -61,7 +72,7 @@ func (p *Provider) GetEvents(ctx context.Context, calendarIDs []string, from, to
 	}
 
 	// Parse iCal data using shared parser
-	events, err := ParseICalData(icalData, p.url, "iCal Calendar", from, to)
+	events, err := ParseICalData(icalData, p.url, "iCal Calendar", from, to, p.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iCal data: %v", err)
 	}

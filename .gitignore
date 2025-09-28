@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-calendar-notifier
+/calendar-notifier
 
 # Test binary, built with `go test -c`
 *.test

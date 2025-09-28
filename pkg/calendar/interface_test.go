@@ -3,6 +3,7 @@ package calendar
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -52,6 +53,10 @@ func (m *MockProvider) IsHealthy(ctx context.Context) error {
 
 func (m *MockProvider) Close() error {
 	return nil
+}
+
+func (m *MockProvider) SetLogger(logger *slog.Logger) {
+	// No-op for mock provider
 }
 
 func (m *MockProvider) SetEvents(events []*models.Event) {

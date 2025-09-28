@@ -78,10 +78,14 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 	}
 
 	// Connect to NATS
+	logger.Info("Connecting to NATS", "url", config.URL, "subject", config.Subject)
 	conn, err := nats.Connect(config.URL, options...)
 	if err != nil {
+		logger.Error("Failed to connect to NATS", "url", config.URL, "error", err)
 		return nil, fmt.Errorf("failed to connect to NATS at %s: %v", config.URL, err)
 	}
+
+	logger.Info("Successfully connected to NATS", "url", config.URL, "servers", conn.Servers())
 
 	publisher := &Publisher{
 		conn:    conn,

@@ -30,6 +30,9 @@ type Provider interface {
 
 	// Close cleans up any resources used by the provider
 	Close() error
+
+	// SetLogger configures the logger for this provider
+	SetLogger(logger *slog.Logger)
 }
 
 
@@ -74,6 +77,7 @@ func NewManagerWithCoordinator(factory ProviderFactory, coordinatorConfig *Coord
 // AddProvider adds a calendar provider to the manager
 func (m *Manager) AddProvider(name string, provider Provider) {
 	m.providers[name] = provider
+	m.logger.Info("Added calendar provider", "name", name, "type", provider.Type())
 }
 
 // GetProvider retrieves a calendar provider by name

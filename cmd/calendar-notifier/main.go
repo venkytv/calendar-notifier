@@ -123,6 +123,9 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 			return nil, fmt.Errorf("failed to create %s calendar provider: %w", calendarCfg.Type, err)
 		}
 
+		// Set logger for the provider
+		provider.SetLogger(logger)
+
 		// Initialize provider based on type
 		ctx := context.Background()
 		switch calendarCfg.Type {
