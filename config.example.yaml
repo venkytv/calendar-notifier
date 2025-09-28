@@ -12,31 +12,38 @@ nats:
 # Calendar provider configurations
 # You can configure multiple calendars from different providers
 calendars:
-  # Google Calendar configuration
-  - name: "personal-google"
-    type: "google"
-    # Path to Google Calendar API credentials JSON file
-    # This should be a service account JSON file downloaded from Google Cloud Console
-    # See README.md "Google Calendar Setup" section for detailed instructions
-    # Set file permissions: chmod 600 /path/to/credentials.json
-    credentials: "/path/to/google-calendar-credentials.json"
-    # Optional: Specific calendar IDs to monitor (if empty, monitors all accessible calendars)
-    # Get calendar IDs from Google Calendar settings or leave empty for primary calendar
-    calendar_ids:
-      - "primary"
-      # - "example@gmail.com"
-      # - "abcd1234efgh5678@group.calendar.google.com"
-    # How often to poll this calendar for changes
+  # CalDAV configuration (works with Google, Apple, Outlook, Nextcloud, etc.)
+  - name: "my-calendar"
+    type: "caldav"
+    # CalDAV server URL - see examples below for different providers
+    url: "https://calendar.google.com/calendar/dav/your-email@gmail.com/events"
+    username: "your-email@gmail.com"
+    password: "your-app-password"  # Use app password, not your main password!
     poll_interval: "5m"
 
-  # Example of a second Google Calendar (e.g., work calendar)
-  # You can use the same credentials file if the service account has access to multiple calendars
-  - name: "work-google"
-    type: "google"
-    credentials: "/path/to/work-google-credentials.json"  # Could be same file as above
-    calendar_ids:
-      - "work@company.com"  # Specific calendar ID shared with service account
-    poll_interval: "2m"
+  # Example: Apple iCloud Calendar
+  - name: "icloud-calendar"
+    type: "caldav"
+    url: "https://caldav.icloud.com/[your-calendar-id]/calendars/[specific-calendar]/"
+    username: "your-apple-id@icloud.com"
+    password: "your-app-specific-password"
+    poll_interval: "5m"
+
+  # Example: Outlook/Office365 Calendar
+  - name: "outlook-calendar"
+    type: "caldav"
+    url: "https://outlook.office365.com/EWS/Exchange.asmx"
+    username: "your-email@outlook.com"
+    password: "your-password"
+    poll_interval: "5m"
+
+  # Example: Google Calendar with OAuth2 (alternative to CalDAV)
+  # - name: "google-oauth"
+  #   type: "google"
+  #   credentials: "/path/to/google-oauth-credentials.json"
+  #   calendar_ids:
+  #     - "primary"
+  #   poll_interval: "5m"
 
 # Default notification settings
 defaults:

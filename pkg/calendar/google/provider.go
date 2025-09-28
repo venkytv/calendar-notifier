@@ -2,8 +2,11 @@ package google
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -20,7 +23,8 @@ type Provider struct {
 	name            string
 	credentialsPath string
 	service         *calendar.Service
-	config          *oauth2.Config
+	oauth2Config    *oauth2.Config
+	tokenPath       string
 }
 
 // NewProvider creates a new Google Calendar provider
@@ -44,26 +48,54 @@ func (p *Provider) Type() string {
 func (p *Provider) Initialize(ctx context.Context, credentialsPath string) error {
 	p.credentialsPath = credentialsPath
 
-	// Read credentials from file
-	credentials, err := os.ReadFile(credentialsPath)
+	// Read credentials file to determine type
+	credentialsData, err := os.ReadFile(credentialsPath)
 	if err != nil {
-		return fmt.Errorf("unable to read client secret file: %v", err)
+		return fmt.Errorf("unable to read credentials file: %v", err)
 	}
 
-	// Parse the credentials and create oauth2 config
-	config, err := google.ConfigFromJSON(credentials, calendar.CalendarReadonlyScope)
-	if err != nil {
-		return fmt.Errorf("unable to parse client secret file to config: %v", err)
+	// Parse JSON to check credential type
+	var credType struct {
+		Type string `json:"type"`
 	}
-	p.config = config
+	if err := json.Unmarshal(credentialsData, &credType); err != nil {
+		return fmt.Errorf("unable to parse credentials JSON: %v", err)
+	}
 
-	// Create calendar service with a basic token (for service accounts or pre-authorized tokens)
-	// In a real implementation, this would handle the full OAuth2 flow
-	client := config.Client(ctx, &oauth2.Token{})
+	var service *calendar.Service
 
-	service, err := calendar.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		return fmt.Errorf("unable to retrieve Calendar client: %v", err)
+	switch credType.Type {
+	case "service_account":
+		// Use service account credentials
+		service, err = calendar.NewService(ctx, option.WithCredentialsFile(credentialsPath))
+		if err != nil {
+			return fmt.Errorf("unable to create Calendar service with service account: %v", err)
+		}
+
+	case "":
+		// Assume OAuth2 client credentials (no "type" field)
+		fallthrough
+	default:
+		// Use OAuth2 client credentials
+		config, err := google.ConfigFromJSON(credentialsData, calendar.CalendarReadonlyScope)
+		if err != nil {
+			return fmt.Errorf("unable to parse OAuth2 client credentials: %v", err)
+		}
+		p.oauth2Config = config
+
+		// Set up token storage path
+		p.tokenPath = filepath.Join(filepath.Dir(credentialsPath), "token.json")
+
+		// Get OAuth2 token (will prompt for auth if needed)
+		client, err := p.getOAuth2Client(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get OAuth2 client: %v", err)
+		}
+
+		service, err = calendar.NewService(ctx, option.WithHTTPClient(client))
+		if err != nil {
+			return fmt.Errorf("unable to create Calendar service with OAuth2: %v", err)
+		}
 	}
 
 	p.service = service
@@ -115,6 +147,14 @@ func (p *Provider) GetCalendars(ctx context.Context) ([]*calendarPkg.Calendar, e
 		return nil, fmt.Errorf("unable to retrieve calendar list: %v", err)
 	}
 
+	// Log calendar access for debugging
+	if len(calendarList.Items) == 0 {
+		fmt.Printf("WARNING: Service account has access to 0 calendars. This usually means:\n")
+		fmt.Printf("  1. No calendars are shared with the service account email, OR\n")
+		fmt.Printf("  2. You need to use OAuth2 client credentials instead of service account\n")
+		fmt.Printf("  3. Service account email: check 'client_email' field in your credentials JSON\n")
+	}
+
 	var calendars []*calendarPkg.Calendar
 	for _, item := range calendarList.Items {
 		cal := &calendarPkg.Calendar{
@@ -151,8 +191,72 @@ func (p *Provider) Close() error {
 	// Google Calendar service doesn't require explicit cleanup
 	// HTTP client connections are managed by the underlying client
 	p.service = nil
-	p.config = nil
 	return nil
+}
+
+// getOAuth2Client gets an OAuth2 HTTP client, handling token storage and refresh
+func (p *Provider) getOAuth2Client(ctx context.Context) (*http.Client, error) {
+	// Try to load existing token
+	token, err := p.loadToken()
+	if err != nil {
+		// No valid token found, need to authorize
+		token, err = p.authorizeNewToken(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to authorize: %v", err)
+		}
+	}
+
+	// Create client with token
+	client := p.oauth2Config.Client(ctx, token)
+	return client, nil
+}
+
+// loadToken loads token from file
+func (p *Provider) loadToken() (*oauth2.Token, error) {
+	file, err := os.Open(p.tokenPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	token := &oauth2.Token{}
+	err = json.NewDecoder(file).Decode(token)
+	return token, err
+}
+
+// saveToken saves token to file
+func (p *Provider) saveToken(token *oauth2.Token) error {
+	file, err := os.OpenFile(p.tokenPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return json.NewEncoder(file).Encode(token)
+}
+
+// authorizeNewToken performs OAuth2 authorization flow
+func (p *Provider) authorizeNewToken(ctx context.Context) (*oauth2.Token, error) {
+	authURL := p.oauth2Config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("\nGo to the following link in your browser:\n%v\n\n", authURL)
+	fmt.Print("Enter the authorization code: ")
+
+	var authCode string
+	if _, err := fmt.Scan(&authCode); err != nil {
+		return nil, fmt.Errorf("unable to read authorization code: %v", err)
+	}
+
+	token, err := p.oauth2Config.Exchange(ctx, authCode)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve token from web: %v", err)
+	}
+
+	// Save token for future use
+	if err := p.saveToken(token); err != nil {
+		fmt.Printf("Warning: unable to save token: %v\n", err)
+	}
+
+	return token, nil
 }
 
 // convertGoogleEventToInternalEvent converts a Google Calendar event to our internal Event model

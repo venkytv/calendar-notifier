@@ -3,6 +3,7 @@ module github.com/venkytv/calendar-notifier
 go 1.25.0
 
 require (
+	github.com/arran4/golang-ical v0.3.2
 	github.com/nats-io/nats.go v1.46.0
 	golang.org/x/oauth2 v0.31.0
 	google.golang.org/api v0.250.0

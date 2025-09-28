@@ -93,12 +93,17 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 		"to", to.Format(time.RFC3339))
 
 	for name, provider := range m.providers {
-		m.logger.Debug("Fetching events from provider", "provider", name)
+		m.logger.Debug("Fetching events from provider",
+			"provider_name", name,
+			"provider_type", provider.Type())
 
 		// Get available calendars from the provider
 		calendars, err := provider.GetCalendars(ctx)
 		if err != nil {
-			m.logger.Error("Failed to get calendars from provider", "provider", name, "error", err)
+			m.logger.Error("Failed to get calendars from provider",
+				"provider_name", name,
+				"provider_type", provider.Type(),
+				"error", err)
 			return nil, err
 		}
 
@@ -109,13 +114,18 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 
 		// If no calendars found, skip this provider
 		if len(calendarIDs) == 0 {
-			m.logger.Debug("No calendars found for provider", "provider", name)
+			m.logger.Debug("No calendars found for provider",
+				"provider_name", name,
+				"provider_type", provider.Type())
 			continue
 		}
 
 		events, err := provider.GetEvents(ctx, calendarIDs, from, to)
 		if err != nil {
-			m.logger.Error("Failed to get events from provider", "provider", name, "error", err)
+			m.logger.Error("Failed to get events from provider",
+				"provider_name", name,
+				"provider_type", provider.Type(),
+				"error", err)
 			return nil, err
 		}
 
@@ -125,7 +135,8 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 		}
 
 		m.logger.Debug("Fetched events from provider",
-			"provider", name,
+			"provider_name", name,
+			"provider_type", provider.Type(),
 			"event_count", len(events))
 
 		allEvents = append(allEvents, events...)

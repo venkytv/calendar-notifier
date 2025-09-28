@@ -32,76 +32,74 @@ A Go-based calendar notification daemon that monitors multiple calendars and pub
    ./calendar-notifier --config config.yaml
    ```
 
-## Google Calendar Setup
+## Calendar Setup
 
-To access Google Calendar, you need to set up API credentials:
+The calendar notifier supports multiple calendar providers through CalDAV (recommended) and Google Calendar API.
 
-### 1. Create a Google Cloud Project
+### CalDAV Setup (Recommended - Universal)
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Click **"Create Project"** or select an existing project
-3. Note your Project ID for reference
+CalDAV works with **any** calendar provider: Google, Apple, Outlook, Nextcloud, etc. It's much simpler than provider-specific APIs.
 
-### 2. Enable Google Calendar API
+#### Google Calendar via CalDAV
 
-1. In your Google Cloud Console, go to **APIs & Services > Library**
-2. Search for **"Google Calendar API"**
-3. Click on it and press **"Enable"**
+1. **Enable 2-Factor Authentication** in your Google Account
+2. **Generate App Password:**
+   - Go to [Google Account settings](https://myaccount.google.com/)
+   - Security → 2-Step Verification → App passwords
+   - Generate password for "Mail" or "Other"
+3. **Configure calendar:**
+   ```yaml
+   calendars:
+     - name: "my-google-calendar"
+       type: "caldav"
+       url: "https://calendar.google.com/calendar/dav/your-email@gmail.com/events"
+       username: "your-email@gmail.com"
+       password: "your-16-character-app-password"
+   ```
 
-### 3. Create Service Account Credentials
+#### Apple iCloud Calendar
 
-For server-to-server access (recommended for daemons):
+1. **Enable 2-Factor Authentication** for your Apple ID
+2. **Generate App-Specific Password:**
+   - Go to [appleid.apple.com](https://appleid.apple.com/)
+   - Sign In → App-Specific Passwords → Generate
+3. **Find your calendar URL:**
+   - Calendar app → Preferences → Accounts → iCloud → Server Settings
+4. **Configure calendar:**
+   ```yaml
+   calendars:
+     - name: "my-icloud-calendar"
+       type: "caldav"
+       url: "https://caldav.icloud.com/published/2/YOUR_CALENDAR_ID"
+       username: "your-apple-id@icloud.com"
+       password: "your-app-specific-password"
+   ```
 
-1. Go to **APIs & Services > Credentials**
-2. Click **"Create Credentials" > "Service Account"**
-3. Fill in service account details:
-   - **Name**: `calendar-notifier`
-   - **Description**: `Service account for calendar notification daemon`
-4. Click **"Create and Continue"**
-5. Skip the optional steps and click **"Done"**
+#### Outlook/Office365 Calendar
 
-### 4. Generate and Download Credentials
+```yaml
+calendars:
+  - name: "my-outlook-calendar"
+    type: "caldav"
+    url: "https://outlook.office365.com/EWS/Exchange.asmx"
+    username: "your-email@outlook.com"
+    password: "your-password"
+```
 
-1. In **APIs & Services > Credentials**, find your service account
-2. Click on the service account name
-3. Go to the **"Keys"** tab
-4. Click **"Add Key" > "Create new key"**
-5. Select **JSON** format and click **"Create"**
-6. Save the downloaded JSON file securely (e.g., `google-calendar-credentials.json`)
-7. Set appropriate file permissions: `chmod 600 google-calendar-credentials.json`
+### Google Calendar API (Alternative)
 
-### 5. Share Calendars with Service Account
+If you prefer the full Google Calendar API (more complex but more features):
 
-Since service accounts don't have their own calendars, you need to share your calendars:
-
-1. Open [Google Calendar](https://calendar.google.com/)
-2. Find the calendar you want to monitor in the left sidebar
-3. Click the three dots next to the calendar name
-4. Select **"Settings and sharing"**
-5. Scroll to **"Share with specific people"**
-6. Click **"Add people"**
-7. Enter your service account email (found in the JSON file as `client_email`)
-8. Set permission to **"See all event details"**
-9. Click **"Send"**
-
-### 6. Get Calendar IDs (Optional)
-
-To monitor specific calendars, you need their IDs:
-
-1. In Google Calendar settings, go to the calendar you want to monitor
-2. Scroll to **"Integrate calendar"**
-3. Copy the **Calendar ID** (looks like `abcd1234@group.calendar.google.com`)
-4. For your primary calendar, you can use `"primary"` as the ID
-
-### Alternative: OAuth2 Credentials (Interactive Setup)
-
-If you prefer OAuth2 (requires initial interactive authentication):
-
-1. In **APIs & Services > Credentials**, click **"Create Credentials" > "OAuth client ID"**
-2. Select **"Desktop application"**
-3. Name it `calendar-notifier-oauth`
-4. Download the JSON file
-5. The application will prompt for authentication on first run
+1. **Set up Google Cloud Project** and enable Calendar API
+2. **Create OAuth2 credentials** for desktop application
+3. **Configure:**
+   ```yaml
+   calendars:
+     - name: "my-google-api"
+       type: "google"
+       credentials: "/path/to/oauth-credentials.json"
+       calendar_ids: ["primary"]
+   ```
 
 ## Configuration
 

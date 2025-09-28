@@ -23,9 +23,14 @@ type NATSConfig struct {
 type CalendarConfig struct {
 	Name         string        `yaml:"name"`
 	Type         string        `yaml:"type"`
-	Credentials  string        `yaml:"credentials"`
+	Credentials  string        `yaml:"credentials"` // For file-based credentials (Google API)
 	CalendarIDs  []string      `yaml:"calendar_ids"`
 	PollInterval time.Duration `yaml:"poll_interval"`
+
+	// CalDAV-specific settings
+	URL      string `yaml:"url"`      // CalDAV server URL
+	Username string `yaml:"username"` // CalDAV username
+	Password string `yaml:"password"` // CalDAV password
 }
 
 type DefaultsConfig struct {
@@ -74,9 +79,31 @@ func (c *Config) validate() error {
 		if cal.Type == "" {
 			return fmt.Errorf("calendar[%d]: type is required", i)
 		}
-		if cal.Credentials == "" {
-			return fmt.Errorf("calendar[%d]: credentials path is required", i)
+
+		// Validate based on calendar type
+		switch cal.Type {
+		case "google":
+			if cal.Credentials == "" {
+				return fmt.Errorf("calendar[%d]: credentials path is required for Google Calendar", i)
+			}
+		case "caldav":
+			if cal.URL == "" {
+				return fmt.Errorf("calendar[%d]: URL is required for CalDAV", i)
+			}
+			if cal.Username == "" {
+				return fmt.Errorf("calendar[%d]: username is required for CalDAV", i)
+			}
+			if cal.Password == "" {
+				return fmt.Errorf("calendar[%d]: password is required for CalDAV", i)
+			}
+		case "ical":
+			if cal.URL == "" {
+				return fmt.Errorf("calendar[%d]: URL is required for iCal", i)
+			}
+		default:
+			return fmt.Errorf("calendar[%d]: unsupported calendar type '%s'", i, cal.Type)
 		}
+
 		if cal.PollInterval == 0 {
 			c.Calendars[i].PollInterval = 5 * time.Minute // default
 		}

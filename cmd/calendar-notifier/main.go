@@ -12,6 +12,7 @@ import (
 
 	"github.com/venkytv/calendar-notifier/internal/models"
 	"github.com/venkytv/calendar-notifier/pkg/calendar"
+	"github.com/venkytv/calendar-notifier/pkg/calendar/caldav"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/providers"
 	"github.com/venkytv/calendar-notifier/pkg/config"
 	"github.com/venkytv/calendar-notifier/pkg/nats"
@@ -122,8 +123,40 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 			return nil, fmt.Errorf("failed to create %s calendar provider: %w", calendarCfg.Type, err)
 		}
 
-		// TODO: Initialize provider with credentials path
-		// This will require adding an Initialize method to the Provider interface
+		// Initialize provider based on type
+		ctx := context.Background()
+		switch calendarCfg.Type {
+		case "google":
+			if err := provider.Initialize(ctx, calendarCfg.Credentials); err != nil {
+				return nil, fmt.Errorf("failed to initialize %s provider: %w", calendarCfg.Name, err)
+			}
+
+		case "caldav":
+			// CalDAV providers need special initialization
+			caldavProvider, ok := provider.(*caldav.SimpleProvider)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast to CalDAV provider")
+			}
+
+			caldavConfig := &caldav.Config{
+				URL:      calendarCfg.URL,
+				Username: calendarCfg.Username,
+				Password: calendarCfg.Password,
+			}
+
+			if err := caldavProvider.InitializeWithConfig(caldavConfig); err != nil {
+				return nil, fmt.Errorf("failed to initialize %s CalDAV provider: %w", calendarCfg.Name, err)
+			}
+
+		case "ical":
+			// iCal providers just need the URL
+			if err := provider.Initialize(ctx, calendarCfg.URL); err != nil {
+				return nil, fmt.Errorf("failed to initialize %s iCal provider: %w", calendarCfg.Name, err)
+			}
+
+		default:
+			return nil, fmt.Errorf("unsupported provider type: %s", calendarCfg.Type)
+		}
 
 		calendarManager.AddProvider(calendarCfg.Name, provider)
 
