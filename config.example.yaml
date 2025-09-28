@@ -1,0 +1,56 @@
+# Calendar Notifier Configuration Example
+# Copy this file to config.yaml and customize for your environment
+
+# NATS message broker configuration
+nats:
+  # NATS server URL - can be a single server or comma-separated list for clustering
+  url: "nats://localhost:4222"
+  # Subject to publish calendar notifications to
+  # This should match what your calendar-siren consumer is listening on
+  subject: "calendar.notifications"
+
+# Calendar provider configurations
+# You can configure multiple calendars from different providers
+calendars:
+  # Google Calendar configuration
+  - name: "personal-google"
+    type: "google"
+    # Path to Google Calendar API credentials JSON file
+    # This should be a service account JSON file downloaded from Google Cloud Console
+    # See README.md "Google Calendar Setup" section for detailed instructions
+    # Set file permissions: chmod 600 /path/to/credentials.json
+    credentials: "/path/to/google-calendar-credentials.json"
+    # Optional: Specific calendar IDs to monitor (if empty, monitors all accessible calendars)
+    # Get calendar IDs from Google Calendar settings or leave empty for primary calendar
+    calendar_ids:
+      - "primary"
+      # - "example@gmail.com"
+      # - "abcd1234efgh5678@group.calendar.google.com"
+    # How often to poll this calendar for changes
+    poll_interval: "5m"
+
+  # Example of a second Google Calendar (e.g., work calendar)
+  # You can use the same credentials file if the service account has access to multiple calendars
+  - name: "work-google"
+    type: "google"
+    credentials: "/path/to/work-google-credentials.json"  # Could be same file as above
+    calendar_ids:
+      - "work@company.com"  # Specific calendar ID shared with service account
+    poll_interval: "2m"
+
+# Default notification settings
+defaults:
+  # Default notification intervals in minutes before event start
+  # These are used when events don't have their own alarm/reminder settings
+  notification_intervals: [15, 5]  # 15 minutes and 5 minutes before
+
+  # Default severity level for notifications
+  # Options: "low", "normal", "high", "critical"
+  default_severity: "normal"
+
+# Logging configuration
+logging:
+  # Log level: "debug", "info", "warn", "error"
+  level: "info"
+  # Log format: "json" (recommended for production) or "text" (human readable)
+  format: "json"

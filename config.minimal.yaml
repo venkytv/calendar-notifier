@@ -1,0 +1,21 @@
+# Minimal Calendar Notifier Configuration
+# This is the bare minimum configuration to get started
+
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+
+calendars:
+  - name: "my-calendar"
+    type: "google"
+    # See README.md "Google Calendar Setup" for credential setup instructions
+    credentials: "google-calendar-credentials.json"
+    poll_interval: "5m"
+
+defaults:
+  notification_intervals: [15, 5]
+  default_severity: "normal"
+
+logging:
+  level: "info"
+  format: "json"
