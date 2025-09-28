@@ -15,7 +15,7 @@ Build a Go-based calendar notification daemon that monitors multiple calendars a
 - [x] **Create NATS message publishing package** - NATS client setup, message formatting to calendar-siren spec
 
 ### Phase 3: Business Logic (Tasks 6-8)
-- [ ] **Implement scheduling engine for event monitoring** - Event polling, upcoming meeting detection, timer management
+- [x] **Implement scheduling engine for event monitoring** - Event polling, upcoming meeting detection, timer management
 - [ ] **Create alarm processing logic** - Extract alarms from events, apply default intervals, calculate lead times
 - [ ] **Implement multi-calendar coordination** - Merge events from multiple sources, deduplicate, prioritize
 
