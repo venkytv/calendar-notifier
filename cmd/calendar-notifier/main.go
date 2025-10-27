@@ -13,6 +13,7 @@ import (
 	"github.com/venkytv/calendar-notifier/internal/models"
 	"github.com/venkytv/calendar-notifier/pkg/calendar"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/caldav"
+	"github.com/venkytv/calendar-notifier/pkg/calendar/google"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/providers"
 	"github.com/venkytv/calendar-notifier/pkg/config"
 	"github.com/venkytv/calendar-notifier/pkg/nats"
@@ -181,6 +182,26 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 			if err := provider.Initialize(ctx, calendarCfg.URL); err != nil {
 				return nil, fmt.Errorf("failed to initialize %s iCal provider: %w", calendarCfg.Name, err)
 			}
+
+		case "google":
+			// Google Calendar providers need OAuth2 credentials
+			googleProvider, ok := provider.(*google.Provider)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast to Google Calendar provider")
+			}
+
+			// Set custom token file path if specified
+			if calendarCfg.TokenFile != "" {
+				googleProvider.SetTokenFile(calendarCfg.TokenFile)
+			}
+
+			// Initialize with credentials file
+			if err := googleProvider.Initialize(ctx, calendarCfg.CredentialsFile); err != nil {
+				return nil, fmt.Errorf("failed to initialize %s Google Calendar provider: %w\n\nFor initial setup, you may need to authenticate. See the error message above for instructions.", calendarCfg.Name, err)
+			}
+
+			// Store calendar IDs for this provider (Google uses explicit calendar IDs)
+			googleProvider.SetCalendarIDs(calendarCfg.CalendarIDs)
 
 		default:
 			return nil, fmt.Errorf("unsupported provider type: %s", calendarCfg.Type)

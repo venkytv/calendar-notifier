@@ -26,10 +26,14 @@ type CalendarConfig struct {
 	CalendarIDs  []string      `yaml:"calendar_ids"`
 	PollInterval time.Duration `yaml:"poll_interval"`
 
-	// CalDAV-specific settings
-	URL      string `yaml:"url"`      // CalDAV server URL
+	// CalDAV/iCal-specific settings
+	URL      string `yaml:"url"`      // CalDAV server URL or iCal URL
 	Username string `yaml:"username"` // CalDAV username
 	Password string `yaml:"password"` // CalDAV password
+
+	// Google Calendar-specific settings
+	CredentialsFile string `yaml:"credentials_file"` // Path to OAuth2 credentials JSON
+	TokenFile       string `yaml:"token_file"`       // Path to store OAuth2 tokens (optional)
 }
 
 type DefaultsConfig struct {
@@ -94,6 +98,13 @@ func (c *Config) validate() error {
 		case "ical":
 			if cal.URL == "" {
 				return fmt.Errorf("calendar[%d]: URL is required for iCal", i)
+			}
+		case "google":
+			if cal.CredentialsFile == "" {
+				return fmt.Errorf("calendar[%d]: credentials_file is required for Google Calendar", i)
+			}
+			if len(cal.CalendarIDs) == 0 {
+				return fmt.Errorf("calendar[%d]: at least one calendar_id is required for Google Calendar", i)
 			}
 		default:
 			return fmt.Errorf("calendar[%d]: unsupported calendar type '%s'", i, cal.Type)

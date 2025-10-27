@@ -1,0 +1,58 @@
+# Example configuration with Google Calendar provider
+#
+# This shows how to configure calendar-notifier to monitor Google Calendar
+# events using OAuth2 authentication.
+
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+
+calendars:
+  # Google Calendar with OAuth2
+  - name: "Work Google Calendar"
+    type: "google"
+
+    # Path to OAuth2 client credentials from Google Cloud Console
+    credentials_file: "/etc/calendar-notifier/google-credentials.json"
+
+    # Path where OAuth2 access/refresh tokens will be stored
+    # If not specified, defaults to {credentials_file}.token
+    token_file: "/var/lib/calendar-notifier/google-token.json"
+
+    # List of calendar IDs to monitor
+    # - Use "primary" for your main calendar
+    # - Use email address for other calendars
+    calendar_ids:
+      - "primary"                    # Your primary Google Calendar
+      - "team@company.com"           # Shared team calendar
+      - "holidays@group.calendar.google.com"  # Holiday calendar
+
+    # How often to poll for events (optional, defaults to 5m)
+    poll_interval: 5m
+
+  # You can also mix multiple calendar types
+  - name: "Personal iCal"
+    type: "ical"
+    url: "https://calendar.example.com/personal.ics"
+    poll_interval: 10m
+
+  # CalDAV example (e.g., for Apple Calendar Server)
+  - name: "CalDAV Calendar"
+    type: "caldav"
+    url: "https://caldav.example.com/calendars/user@example.com/default/"
+    username: "user@example.com"
+    password: "secret-password"
+    poll_interval: 5m
+
+# Default notification settings
+defaults:
+  # If an event has no reminders/alarms, use these lead times (in minutes)
+  notification_intervals: [10, 30, 60]
+
+  # Default severity for notifications without explicit severity
+  default_severity: "normal"
+
+# Logging configuration
+logging:
+  level: "info"      # debug, info, warn, error
+  format: "json"     # json or text

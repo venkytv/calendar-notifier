@@ -1,0 +1,27 @@
+[Unit]
+Description=Calendar Notifier Service
+Documentation=https://github.com/venkytv/calendar-notifier
+After=network.target
+ConditionPathExists=/etc/calendar-notifier/config.yaml
+
+[Service]
+Type=simple
+User=calendar-notifier
+Group=calendar-notifier
+WorkingDirectory=/opt/calendar-notifier
+ExecStart=/opt/calendar-notifier/calendar-notifier -config /etc/calendar-notifier/config.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calendar-notifier
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/calendar-notifier
+
+[Install]
+WantedBy=multi-user.target

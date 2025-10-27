@@ -32,6 +32,9 @@ go.work.sum
 conf.yaml
 conf.*.yaml
 
+# Build directories
+/build/
+
 # Editor/IDE
 # .idea/
 # .vscode/

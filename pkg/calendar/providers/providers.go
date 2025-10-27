@@ -3,6 +3,7 @@ package providers
 import (
 	"github.com/venkytv/calendar-notifier/pkg/calendar"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/caldav"
+	"github.com/venkytv/calendar-notifier/pkg/calendar/google"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/ical"
 )
 
@@ -16,5 +17,10 @@ func InitializeBuiltinProviders(factory *calendar.DefaultProviderFactory) {
 	// Register iCal provider (for public iCal URLs)
 	factory.RegisterProvider("ical", func() calendar.Provider {
 		return ical.NewProvider()
+	})
+
+	// Register Google Calendar provider (OAuth2-based)
+	factory.RegisterProvider("google", func() calendar.Provider {
+		return google.NewProvider()
 	})
 }

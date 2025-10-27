@@ -4,7 +4,10 @@ A Go-based calendar notification daemon that monitors multiple calendars and pub
 
 ## Features
 
-- **Multiple Calendar Support**: Monitor Google Calendar (with more providers planned)
+- **Multiple Calendar Providers**:
+  - **CalDAV**: Universal support for Google Calendar, Apple iCloud, Outlook, Nextcloud, and more
+  - **iCal**: Direct URL-based calendar feeds
+  - **Google Calendar API**: Full OAuth2-based Google Calendar integration
 - **NATS Integration**: Publishes notifications in JSON format compatible with calendar-siren
 - **Flexible Scheduling**: Respects event-specific alarms or uses configurable defaults
 - **Multi-Calendar Coordination**: Deduplicates events across multiple calendar sources
@@ -17,24 +20,35 @@ A Go-based calendar notification daemon that monitors multiple calendars and pub
 1. **Build the application:**
    ```bash
    go build -o calendar-notifier ./cmd/calendar-notifier
+   # Or use the Makefile
+   make build
    ```
 
 2. **Create configuration file:**
    ```bash
-   cp config.example.yaml config.yaml
+   # Choose an example configuration based on your needs
+   cp examples/minimal-config.yaml config.yaml
    # Edit config.yaml with your settings
    ```
 
-3. **Set up Google Calendar credentials** (see Google Calendar Setup section below)
+3. **Set up calendar credentials** (see Calendar Setup section below for your provider)
 
 4. **Run the service:**
    ```bash
    ./calendar-notifier --config config.yaml
+   # Or with debug output
+   ./calendar-notifier --config config.yaml --debug
    ```
 
 ## Calendar Setup
 
-The calendar notifier supports multiple calendar providers through CalDAV (recommended) and Google Calendar API.
+The calendar notifier supports three calendar provider types:
+
+1. **CalDAV** (Recommended): Universal support for any CalDAV-compatible calendar service
+2. **iCal**: Simple URL-based calendar feeds (.ics files)
+3. **Google Calendar API**: Full OAuth2-based integration with advanced features
+
+Choose the provider that best fits your needs. See `examples/` directory for complete configuration examples.
 
 ### CalDAV Setup (Recommended - Universal)
 
@@ -86,24 +100,61 @@ calendars:
     password: "your-password"
 ```
 
-### Google Calendar API (Alternative)
+### iCal Setup (URL-based Calendar Feeds)
 
-If you prefer the full Google Calendar API (more complex but more features):
+iCal support allows you to subscribe to any `.ics` calendar URL:
 
-1. **Set up Google Cloud Project** and enable Calendar API
-2. **Create OAuth2 credentials** for desktop application
-3. **Configure:**
-   ```yaml
-   calendars:
-     - name: "my-google-api"
-       type: "google"
-       credentials: "/path/to/oauth-credentials.json"
-       calendar_ids: ["primary"]
-   ```
+```yaml
+calendars:
+  - name: "my-ical-feed"
+    type: "ical"
+    url: "https://calendar.example.com/public-calendar.ics"
+    poll_interval: 10m
+```
+
+**Use cases:**
+- Public calendar feeds
+- Read-only calendar subscriptions
+- Shared team calendars
+- Calendar exports from services without CalDAV
+
+### Google Calendar API Setup (OAuth2-based)
+
+For full Google Calendar API integration with OAuth2 authentication:
+
+**See the complete guide:** [examples/google-calendar-setup.md](examples/google-calendar-setup.md)
+
+**Quick configuration example:**
+```yaml
+calendars:
+  - name: "Work Calendar"
+    type: "google"
+    credentials_file: "/path/to/google-credentials.json"
+    token_file: "/path/to/google-token.json"  # Optional
+    calendar_ids:
+      - "primary"                              # Your primary calendar
+      - "work@example.com"                     # Other calendars
+    poll_interval: 5m
+```
+
+**Setup steps:**
+1. Create Google Cloud Project and enable Calendar API
+2. Create OAuth2 credentials for desktop application
+3. Download credentials JSON file
+4. Run the service for initial authentication
+5. Complete OAuth2 flow in browser
+
+**Helper utilities:**
+- `examples/google-auth-helper.go` - Complete OAuth2 authentication
+- `examples/list-google-calendars.go` - List available calendars
 
 ## Configuration
 
-The service uses YAML configuration. See `config.example.yaml` for a complete example or `config.minimal.yaml` for a minimal setup.
+The service uses YAML configuration. See the `examples/` directory for complete configuration examples:
+- `minimal-config.yaml` - Basic single-calendar setup
+- `multi-source-config.yaml` - Multiple calendars with different providers
+- `config-google.yaml` - Google Calendar API configuration
+- `caldav-config.yaml` - CalDAV configuration examples
 
 ### Configuration Format
 
@@ -113,13 +164,27 @@ nats:
   subject: "calendar.notifications"  # Subject to publish to
 
 calendars:
-  - name: "my-calendar"                    # Unique name for this calendar
-    type: "google"                         # Provider type (currently "google")
-    credentials: "path/to/credentials.json" # Path to credentials file
-    calendar_ids:                          # Optional: specific calendar IDs
-      - "primary"
-      - "work@company.com"
-    poll_interval: "5m"                    # How often to check for events
+  # Google Calendar (OAuth2)
+  - name: "work-calendar"
+    type: "google"
+    credentials_file: "/path/to/google-credentials.json"
+    token_file: "/path/to/google-token.json"  # Optional
+    calendar_ids: ["primary", "team@company.com"]
+    poll_interval: "5m"
+
+  # CalDAV (Universal)
+  - name: "personal-caldav"
+    type: "caldav"
+    url: "https://caldav.example.com/calendars/user@example.com/calendar/"
+    username: "user@example.com"
+    password: "app-password"
+    poll_interval: "5m"
+
+  # iCal (URL-based)
+  - name: "public-events"
+    type: "ical"
+    url: "https://example.com/public-calendar.ics"
+    poll_interval: "10m"
 
 defaults:
   notification_intervals: [15, 5]  # Minutes before event (for events without alarms)
@@ -134,19 +199,31 @@ logging:
 
 ### Common Issues
 
-**"calendar service not initialized"**
-- Check that your credentials file exists and has correct permissions (`chmod 600`)
-- Verify the service account has been shared access to your calendars
-- Ensure the Google Calendar API is enabled in your Google Cloud project
-
 **"failed to connect to NATS"**
 - Make sure NATS server is running: `docker run -p 4222:4222 nats:latest`
 - Check the NATS URL in your configuration
 
-**"No calendars found for provider"**
-- Verify calendar IDs are correct (use `"primary"` for primary calendar)
-- Check that calendars are shared with the service account email
-- Ensure service account has "See all event details" permission
+**"calendar service not initialized"**
+- Check that your credentials/configuration file exists and has correct permissions (`chmod 600`)
+- Verify the calendar URLs are accessible
+- For Google Calendar: Ensure the OAuth2 flow has been completed
+
+**CalDAV Issues:**
+- Verify the CalDAV URL is correct (check your calendar provider's documentation)
+- Test credentials separately using a CalDAV client
+- Check that 2FA is enabled and you're using an app password
+
+**iCal Issues:**
+- Verify the URL is publicly accessible
+- Check that the URL returns a valid `.ics` file format
+- Test the URL in a browser or with `curl`
+
+**Google Calendar Issues:**
+- See [examples/google-calendar-setup.md](examples/google-calendar-setup.md) for detailed troubleshooting
+- Ensure the Calendar API is enabled in Google Cloud Console
+- Verify OAuth2 credentials are for "Desktop application" type
+- Check that the token file has valid refresh token
+- Use `examples/list-google-calendars.go` to verify authentication and calendar access
 
 ### Testing Your Setup
 
@@ -156,3 +233,7 @@ Use dry-run mode to test without publishing:
 ```
 
 This will show detailed logs without actually sending notifications.
+
+### Running as a Service
+
+See `examples/calendar-notifier.service` for a systemd service unit file example.
