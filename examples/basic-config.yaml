@@ -21,6 +21,11 @@ defaults:
   notification_intervals: [15, 30]
   # Default severity for notifications
   default_severity: "normal"
+  # Final reminder: always send a notification this many minutes before each event
+  # This ensures you always get a last-minute reminder regardless of other alarms
+  # Set to 1 to get notified 1 minute before every event
+  # Omit or comment out to disable this feature
+  final_reminder_minutes: 1
 
 # Logging configuration
 logging:

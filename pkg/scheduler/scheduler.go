@@ -27,6 +27,7 @@ type Config struct {
 	PollInterval        time.Duration `yaml:"poll_interval"`
 	LookaheadWindow     time.Duration `yaml:"lookahead_window"`
 	DefaultLeadTimes    []int         `yaml:"default_lead_times"` // minutes
+	FinalReminderMinutes *int         `yaml:"final_reminder_minutes"` // If set, always send this many minutes before event
 	MaxConcurrentEvents int           `yaml:"max_concurrent_events"`
 	TimerBufferSize     int           `yaml:"timer_buffer_size"`
 }
@@ -282,6 +283,30 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 				Severity:        "normal",
 			}
 			alarms = append(alarms, alarm)
+		}
+	}
+
+	// Add final reminder if configured and not already present
+	if s.config.FinalReminderMinutes != nil {
+		finalMinutes := *s.config.FinalReminderMinutes
+		hasFinalReminder := false
+		for _, alarm := range alarms {
+			if alarm.LeadTimeMinutes == finalMinutes {
+				hasFinalReminder = true
+				break
+			}
+		}
+		if !hasFinalReminder {
+			alarm := models.Alarm{
+				LeadTimeMinutes: finalMinutes,
+				Method:          "popup",
+				Severity:        "normal",
+			}
+			alarms = append(alarms, alarm)
+			s.logger.Debug("Added final reminder",
+				"event_id", event.ID,
+				"title", event.Title,
+				"lead_time", finalMinutes)
 		}
 	}
 

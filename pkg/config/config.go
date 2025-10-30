@@ -38,7 +38,8 @@ type CalendarConfig struct {
 
 type DefaultsConfig struct {
 	NotificationIntervals []int  `yaml:"notification_intervals"`
-	DefaultSeverity      string `yaml:"default_severity"`
+	DefaultSeverity       string `yaml:"default_severity"`
+	FinalReminderMinutes  *int   `yaml:"final_reminder_minutes"` // If set, always send a notification this many minutes before each event
 }
 
 type LoggingConfig struct {

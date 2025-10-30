@@ -234,11 +234,12 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 
 	// Create scheduler configuration from app config
 	schedulerConfig := &scheduler.Config{
-		PollInterval:        5 * time.Minute, // Default - could be configurable
-		LookaheadWindow:     24 * time.Hour,
-		DefaultLeadTimes:    cfg.Defaults.NotificationIntervals,
-		MaxConcurrentEvents: 1000,
-		TimerBufferSize:     100,
+		PollInterval:         5 * time.Minute, // Default - could be configurable
+		LookaheadWindow:      24 * time.Hour,
+		DefaultLeadTimes:     cfg.Defaults.NotificationIntervals,
+		FinalReminderMinutes: cfg.Defaults.FinalReminderMinutes,
+		MaxConcurrentEvents:  1000,
+		TimerBufferSize:      100,
 	}
 
 	// Create event scheduler
