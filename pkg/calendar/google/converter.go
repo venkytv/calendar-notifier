@@ -48,17 +48,21 @@ func (p *Provider) convertEvent(item *calendar.Event, calendarID string) (*model
 	// Convert reminders to alarms
 	alarms := p.convertReminders(item)
 
+	// Extract response status from attendees
+	responseStatus := extractResponseStatus(item)
+
 	event := &models.Event{
-		ID:          item.Id,
-		Title:       item.Summary,
-		Description: item.Description,
-		StartTime:   startTime,
-		EndTime:     endTime,
-		Alarms:      alarms,
-		CalendarID:  calendarID,
-		Location:    item.Location,
-		CreatedAt:   createdAt,
-		ModifiedAt:  modifiedAt,
+		ID:             item.Id,
+		Title:          item.Summary,
+		Description:    item.Description,
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Alarms:         alarms,
+		CalendarID:     calendarID,
+		Location:       item.Location,
+		CreatedAt:      createdAt,
+		ModifiedAt:     modifiedAt,
+		ResponseStatus: responseStatus,
 	}
 
 	return event, nil
@@ -136,6 +140,39 @@ func (p *Provider) convertReminders(item *calendar.Event) []models.Alarm {
 	}
 
 	return alarms
+}
+
+// extractResponseStatus extracts the authenticated user's response status from attendees
+func extractResponseStatus(item *calendar.Event) string {
+	if item.Attendees == nil || len(item.Attendees) == 0 {
+		// No attendees means this is likely an event the user created
+		// or a calendar without attendee tracking - treat as accepted
+		return ""
+	}
+
+	// Find the attendee marked as "self" (the authenticated user)
+	for _, attendee := range item.Attendees {
+		if attendee.Self {
+			// Map Google Calendar response status to our internal format
+			// Google uses: "needsAction", "declined", "tentative", "accepted"
+			switch attendee.ResponseStatus {
+			case "accepted":
+				return "accepted"
+			case "declined":
+				return "declined"
+			case "tentative":
+				return "tentative"
+			case "needsAction":
+				return "needsAction"
+			default:
+				return attendee.ResponseStatus
+			}
+		}
+	}
+
+	// If we didn't find "self", this might be an event the user organizes
+	// or we're looking at someone else's calendar - treat as accepted
+	return ""
 }
 
 // convertReminderOverride converts a Google Calendar reminder override to an Alarm

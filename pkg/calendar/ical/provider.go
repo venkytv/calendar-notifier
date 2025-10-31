@@ -127,7 +127,8 @@ func (p *Provider) GetEvents(ctx context.Context, calendarIDs []string, from, to
 	}
 
 	// Parse iCal data using shared parser
-	events, err := ParseICalData(icalData, p.url, "iCal Calendar", from, to, p.logger)
+	// Pass empty string for userEmail as iCal feeds don't have authentication
+	events, err := ParseICalData(icalData, p.url, "iCal Calendar", from, to, "", p.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iCal data: %v", err)
 	}

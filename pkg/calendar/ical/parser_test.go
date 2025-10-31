@@ -299,7 +299,7 @@ END:VCALENDAR`
 		}
 
 		event := events[0]
-		result, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
+		result, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, "", logger)
 
 		if err != nil {
 			t.Errorf("ConvertICSEventToInternalEvent() unexpected error: %v", err)
@@ -368,7 +368,7 @@ END:VCALENDAR`
 		}
 
 		event := events[0]
-		_, err = ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
+		_, err = ConvertICSEventToInternalEvent(event, calendarID, calendarName, "", logger)
 
 		if err == nil {
 			t.Error("ConvertICSEventToInternalEvent() expected error for missing UID, got nil")
@@ -399,7 +399,7 @@ END:VCALENDAR`
 		}
 
 		event := events[0]
-		_, err = ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
+		_, err = ConvertICSEventToInternalEvent(event, calendarID, calendarName, "", logger)
 
 		if err == nil {
 			t.Error("ConvertICSEventToInternalEvent() expected error for missing start time, got nil")
@@ -428,7 +428,7 @@ END:VCALENDAR`
 		}
 
 		event := events[0]
-		result, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
+		result, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, "", logger)
 
 		if err != nil {
 			t.Errorf("ConvertICSEventToInternalEvent() unexpected error: %v", err)
@@ -489,7 +489,7 @@ END:VCALENDAR`
 	from := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2024, 1, 17, 0, 0, 0, 0, time.UTC)
 
-	events, err := ParseICalData(icalData, calendarID, calendarName, from, to, logger)
+	events, err := ParseICalData(icalData, calendarID, calendarName, from, to, "", logger)
 
 	if err != nil {
 		t.Errorf("ParseICalData() unexpected error: %v", err)
@@ -541,7 +541,7 @@ func TestParseICalDataInvalidData(t *testing.T) {
 	// Test invalid iCal data
 	invalidICalData := "This is not valid iCal data"
 
-	_, err := ParseICalData(invalidICalData, calendarID, calendarName, from, to, logger)
+	_, err := ParseICalData(invalidICalData, calendarID, calendarName, from, to, "", logger)
 
 	if err == nil {
 		t.Error("ParseICalData() expected error for invalid iCal data, got nil")
@@ -564,7 +564,7 @@ VERSION:2.0
 PRODID:-//Test//Test Calendar//EN
 END:VCALENDAR`
 
-	events, err := ParseICalData(emptyICalData, calendarID, calendarName, from, to, logger)
+	events, err := ParseICalData(emptyICalData, calendarID, calendarName, from, to, "", logger)
 
 	if err != nil {
 		t.Errorf("ParseICalData() unexpected error for empty calendar: %v", err)
@@ -803,7 +803,7 @@ END:VCALENDAR`
 	from := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2024, 1, 17, 0, 0, 0, 0, time.UTC)
 
-	events, err := ParseICalData(icalData, calendarID, calendarName, from, to, logger)
+	events, err := ParseICalData(icalData, calendarID, calendarName, from, to, "", logger)
 
 	if err != nil {
 		t.Errorf("ParseICalData() unexpected error: %v", err)

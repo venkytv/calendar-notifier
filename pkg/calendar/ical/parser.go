@@ -12,7 +12,7 @@ import (
 )
 
 // ParseICalData parses iCal data using the arran4/golang-ical library
-func ParseICalData(icalData string, calendarID, calendarName string, from, to time.Time, logger *slog.Logger) ([]*models.Event, error) {
+func ParseICalData(icalData string, calendarID, calendarName string, from, to time.Time, userEmail string, logger *slog.Logger) ([]*models.Event, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -26,7 +26,7 @@ func ParseICalData(icalData string, calendarID, calendarName string, from, to ti
 
 	// Process each event in the calendar
 	for _, event := range calendar.Events() {
-		internalEvent, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, logger)
+		internalEvent, err := ConvertICSEventToInternalEvent(event, calendarID, calendarName, userEmail, logger)
 		if err != nil {
 			logger.Warn("Failed to convert iCal event", "error", err, "calendar_id", calendarID)
 			continue
@@ -42,7 +42,7 @@ func ParseICalData(icalData string, calendarID, calendarName string, from, to ti
 }
 
 // ConvertICSEventToInternalEvent converts an ics.VEvent to our internal Event model
-func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName string, logger *slog.Logger) (*models.Event, error) {
+func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName string, userEmail string, logger *slog.Logger) (*models.Event, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -96,6 +96,9 @@ func ConvertICSEventToInternalEvent(event *ics.VEvent, calendarID, calendarName 
 		}
 		internalEvent.Alarms = append(internalEvent.Alarms, *internalAlarm)
 	}
+
+	// Extract response status from attendees
+	internalEvent.ResponseStatus = extractResponseStatusFromAttendees(event, userEmail)
 
 	// Validate required fields
 	if internalEvent.ID == "" {
@@ -225,6 +228,60 @@ func parseICalDuration(duration string) (time.Duration, error) {
 		result = -result
 	}
 	return result, nil
+}
+
+// extractResponseStatusFromAttendees extracts the user's response status from ATTENDEE properties
+func extractResponseStatusFromAttendees(event *ics.VEvent, userEmail string) string {
+	// Get all ATTENDEE properties
+	attendees := event.GetProperties(ics.ComponentPropertyAttendee)
+	if len(attendees) == 0 {
+		// No attendees means this is likely an event the user created
+		// or a calendar without attendee tracking - treat as accepted
+		return ""
+	}
+
+	// If no user email provided, we can't identify the user
+	if userEmail == "" {
+		return ""
+	}
+
+	// Normalize user email for comparison
+	normalizedUserEmail := strings.ToLower(strings.TrimSpace(userEmail))
+
+	// Look for the attendee matching the user's email
+	for _, attendee := range attendees {
+		// ATTENDEE value is typically "mailto:email@example.com"
+		attendeeValue := strings.ToLower(strings.TrimSpace(attendee.Value))
+		attendeeEmail := strings.TrimPrefix(attendeeValue, "mailto:")
+
+		if attendeeEmail == normalizedUserEmail {
+			// Found the user - extract PARTSTAT parameter
+			// PARTSTAT values: NEEDS-ACTION, ACCEPTED, DECLINED, TENTATIVE, DELEGATED
+			partstat := attendee.ICalParameters["PARTSTAT"]
+			if len(partstat) > 0 {
+				status := strings.ToLower(partstat[0])
+				// Map iCal PARTSTAT values to our internal format
+				switch status {
+				case "accepted":
+					return "accepted"
+				case "declined":
+					return "declined"
+				case "tentative":
+					return "tentative"
+				case "needs-action":
+					return "needsAction"
+				default:
+					return status
+				}
+			}
+			// Found attendee but no PARTSTAT - assume needsAction
+			return "needsAction"
+		}
+	}
+
+	// User not found in attendee list - might be viewing someone else's calendar
+	// or calendar doesn't track this user - treat as accepted
+	return ""
 }
 
 // parseInt is a simple helper to parse integers, returning 0 if invalid

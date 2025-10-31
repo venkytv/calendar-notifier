@@ -6,17 +6,18 @@ import (
 
 // Event represents a calendar event with all necessary fields
 type Event struct {
-	ID            string    `json:"id"`
-	Title         string    `json:"title"`
-	Description   string    `json:"description,omitempty"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	Alarms        []Alarm   `json:"alarms,omitempty"`
-	CalendarID    string    `json:"calendar_id"`
-	CalendarName  string    `json:"calendar_name"`
-	Location      string    `json:"location,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	ModifiedAt    time.Time `json:"modified_at"`
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description,omitempty"`
+	StartTime      time.Time `json:"start_time"`
+	EndTime        time.Time `json:"end_time"`
+	Alarms         []Alarm   `json:"alarms,omitempty"`
+	CalendarID     string    `json:"calendar_id"`
+	CalendarName   string    `json:"calendar_name"`
+	Location       string    `json:"location,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	ModifiedAt     time.Time `json:"modified_at"`
+	ResponseStatus string    `json:"response_status,omitempty"` // accepted, declined, tentative, needsAction
 }
 
 // Alarm represents a notification trigger for an event
@@ -69,4 +70,15 @@ func (e *Event) ShouldNotify(alarm *Alarm, now time.Time) bool {
 
 	notificationTime := e.StartTime.Add(-time.Duration(alarm.LeadTimeMinutes) * time.Minute)
 	return now.After(notificationTime) || now.Equal(notificationTime)
+}
+
+// IsAccepted returns true if the user has accepted the event invitation
+// Empty response status is treated as accepted for backward compatibility
+func (e *Event) IsAccepted() bool {
+	// Empty status means we don't have response info - treat as accepted for backward compatibility
+	// This handles events from calendars without attendee info or meetings you organized
+	if e.ResponseStatus == "" {
+		return true
+	}
+	return e.ResponseStatus == "accepted"
 }

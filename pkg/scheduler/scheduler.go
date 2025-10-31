@@ -257,6 +257,15 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 		return
 	}
 
+	// Skip events that have not been accepted
+	if !event.IsAccepted() {
+		s.logger.Debug("Skipping non-accepted event",
+			"event_id", event.ID,
+			"title", event.Title,
+			"response_status", event.ResponseStatus)
+		return
+	}
+
 	// Get or create scheduled event
 	scheduledEvent, exists := s.scheduledEvents[event.ID]
 	if !exists {

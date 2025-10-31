@@ -151,7 +151,8 @@ func (p *SimpleProvider) GetEvents(ctx context.Context, calendarIDs []string, fr
 	}
 
 	// Parse iCal data using shared parser
-	events, err := ical.ParseICalData(icalData, p.url, "CalDAV Calendar", from, to, p.logger)
+	// Pass username as userEmail to identify the authenticated user in attendee lists
+	events, err := ical.ParseICalData(icalData, p.url, "CalDAV Calendar", from, to, p.username, p.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iCal data: %v", err)
 	}
