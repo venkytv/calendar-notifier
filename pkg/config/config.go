@@ -13,6 +13,7 @@ type Config struct {
 	Calendars []CalendarConfig `yaml:"calendars"`
 	Defaults  DefaultsConfig   `yaml:"defaults"`
 	Logging   LoggingConfig    `yaml:"logging"`
+	Metrics   MetricsConfig    `yaml:"metrics"`
 }
 
 type NATSConfig struct {
@@ -45,6 +46,12 @@ type DefaultsConfig struct {
 type LoggingConfig struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
+}
+
+type MetricsConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
 }
 
 func Load(configPath string) (*Config, error) {
@@ -125,6 +132,14 @@ func (c *Config) validate() error {
 	}
 	if c.Logging.Format == "" {
 		c.Logging.Format = "json"
+	}
+
+	// Set metrics defaults
+	if c.Metrics.Address == "" {
+		c.Metrics.Address = "0.0.0.0"
+	}
+	if c.Metrics.Port == 0 {
+		c.Metrics.Port = 9090
 	}
 
 	return nil

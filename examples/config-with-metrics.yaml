@@ -1,0 +1,35 @@
+# Calendar Notifier Configuration with Prometheus Metrics
+# This example shows how to enable Prometheus metrics endpoint
+
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+
+# Metrics configuration
+metrics:
+  enabled: true      # Enable Prometheus metrics endpoint
+  address: "0.0.0.0" # Listen on all interfaces (default)
+  port: 9090         # Metrics port (default)
+
+calendars:
+  # Example iCal calendar
+  - name: "my-calendar"
+    type: "ical"
+    url: "https://example.com/calendar.ics"
+    poll_interval: 5m
+
+defaults:
+  # Default notification intervals if event has no alarms (in minutes)
+  notification_intervals:
+    - 15  # 15 minutes before
+    - 5   # 5 minutes before
+
+  # Always send a final reminder this many minutes before each event
+  # This is in addition to any other alarms configured
+  final_reminder_minutes: 2
+
+  default_severity: "normal"
+
+logging:
+  level: "info"    # debug, info, warn, error
+  format: "json"   # json or text

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/venkytv/calendar-notifier/internal/models"
+	"github.com/venkytv/calendar-notifier/pkg/metrics"
 )
 
 // Provider defines the interface that all calendar implementations must satisfy
@@ -51,6 +52,7 @@ type Manager struct {
 	factory     ProviderFactory
 	coordinator *EventCoordinator
 	logger      *slog.Logger
+	metrics     *metrics.Collector
 }
 
 // NewManager creates a new calendar manager
@@ -71,7 +73,13 @@ func NewManagerWithCoordinator(factory ProviderFactory, coordinatorConfig *Coord
 		factory:     factory,
 		coordinator: coordinator,
 		logger:      logger,
+		metrics:     nil, // Set via SetMetrics()
 	}
+}
+
+// SetMetrics configures the metrics collector for the manager
+func (m *Manager) SetMetrics(metricsCollector *metrics.Collector) {
+	m.metrics = metricsCollector
 }
 
 // AddProvider adds a calendar provider to the manager
@@ -97,17 +105,27 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 		"to", to.Format(time.RFC3339))
 
 	for name, provider := range m.providers {
+		fetchStart := time.Now()
+		providerType := provider.Type()
+
 		m.logger.Debug("Fetching events from provider",
 			"provider_name", name,
-			"provider_type", provider.Type())
+			"provider_type", providerType)
 
 		// Get available calendars from the provider
 		calendars, err := provider.GetCalendars(ctx)
 		if err != nil {
 			m.logger.Error("Failed to get calendars from provider",
 				"provider_name", name,
-				"provider_type", provider.Type(),
+				"provider_type", providerType,
 				"error", err)
+
+			// Record fetch failure
+			if m.metrics != nil {
+				m.metrics.IncEventsFetchFailed(providerType, name)
+				m.metrics.SetCalendarHealthy(providerType, name, false)
+			}
+
 			return nil, err
 		}
 
@@ -120,7 +138,7 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 		if len(calendarIDs) == 0 {
 			m.logger.Debug("No calendars found for provider",
 				"provider_name", name,
-				"provider_type", provider.Type())
+				"provider_type", providerType)
 			continue
 		}
 
@@ -128,8 +146,16 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 		if err != nil {
 			m.logger.Error("Failed to get events from provider",
 				"provider_name", name,
-				"provider_type", provider.Type(),
+				"provider_type", providerType,
 				"error", err)
+
+			// Record fetch failure
+			if m.metrics != nil {
+				m.metrics.IncEventsFetchFailed(providerType, name)
+				m.metrics.SetCalendarHealthy(providerType, name, false)
+				m.metrics.ObserveEventsFetchDuration(providerType, name, time.Since(fetchStart))
+			}
+
 			return nil, err
 		}
 
@@ -140,8 +166,16 @@ func (m *Manager) GetAllEvents(ctx context.Context, from, to time.Time) ([]*mode
 
 		m.logger.Debug("Fetched events from provider",
 			"provider_name", name,
-			"provider_type", provider.Type(),
+			"provider_type", providerType,
 			"event_count", len(events))
+
+		// Record successful fetch
+		if m.metrics != nil {
+			m.metrics.IncEventsFetched(providerType, name, len(events))
+			m.metrics.ObserveEventsFetchDuration(providerType, name, time.Since(fetchStart))
+			m.metrics.SetCalendarLastFetchTime(providerType, name, time.Now())
+			m.metrics.SetCalendarHealthy(providerType, name, true)
+		}
 
 		allEvents = append(allEvents, events...)
 	}

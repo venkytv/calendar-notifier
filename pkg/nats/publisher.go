@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/venkytv/calendar-notifier/internal/models"
+	"github.com/venkytv/calendar-notifier/pkg/metrics"
 	"github.com/venkytv/calendar-notifier/pkg/retry"
 )
 
@@ -19,6 +20,7 @@ type Publisher struct {
 	subject string
 	logger  *slog.Logger
 	retryer *retry.Retryer
+	metrics *metrics.Collector
 }
 
 // Config holds NATS publisher configuration
@@ -48,7 +50,7 @@ func DefaultConfig() *Config {
 }
 
 // NewPublisher creates a new NATS publisher with the given configuration
-func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
+func NewPublisher(config *Config, logger *slog.Logger, metricsCollector *metrics.Collector) (*Publisher, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -67,12 +69,21 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 		nats.ReconnectBufSize(config.ReconnectBuffer),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
 			logger.Warn("NATS disconnected", "error", err)
+			if metricsCollector != nil {
+				metricsCollector.SetNATSConnected(false)
+			}
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
 			logger.Info("NATS reconnected", "url", nc.ConnectedUrl())
+			if metricsCollector != nil {
+				metricsCollector.SetNATSConnected(true)
+			}
 		}),
 		nats.ClosedHandler(func(nc *nats.Conn) {
 			logger.Info("NATS connection closed")
+			if metricsCollector != nil {
+				metricsCollector.SetNATSConnected(false)
+			}
 		}),
 		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
 			logger.Error("NATS error", "error", err, "subject", sub.Subject)
@@ -108,6 +119,12 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 		subject: config.Subject,
 		logger:  logger,
 		retryer: retry.NewRetryer(retryConfig, logger),
+		metrics: metricsCollector,
+	}
+
+	// Set initial connection status
+	if metricsCollector != nil {
+		metricsCollector.SetNATSConnected(true)
 	}
 
 	logger.Info("NATS publisher initialized",
@@ -120,13 +137,21 @@ func NewPublisher(config *Config, logger *slog.Logger) (*Publisher, error) {
 
 // PublishNotification publishes a single calendar notification to NATS with retry logic
 func (p *Publisher) PublishNotification(ctx context.Context, notification *models.Notification) error {
+	start := time.Now()
+
 	if p.conn == nil || p.conn.IsClosed() {
+		if p.metrics != nil {
+			p.metrics.IncNATSPublishFailed()
+		}
 		return fmt.Errorf("NATS connection is not available")
 	}
 
 	// Marshal notification to JSON once
 	data, err := json.Marshal(notification)
 	if err != nil {
+		if p.metrics != nil {
+			p.metrics.IncNATSPublishFailed()
+		}
 		return fmt.Errorf("failed to marshal notification: %v", err)
 	}
 
@@ -161,6 +186,10 @@ func (p *Publisher) PublishNotification(ctx context.Context, notification *model
 			"subject", p.subject,
 			"title", notification.Title,
 			"error", err)
+		if p.metrics != nil {
+			p.metrics.IncNATSPublishFailed()
+			p.metrics.ObserveNATSPublishDuration(time.Since(start))
+		}
 		return err
 	}
 
@@ -169,6 +198,12 @@ func (p *Publisher) PublishNotification(ctx context.Context, notification *model
 		"title", notification.Title,
 		"when", notification.When.Format(time.RFC3339),
 		"lead", notification.Lead)
+
+	// Record successful publish
+	if p.metrics != nil {
+		p.metrics.IncNATSPublished()
+		p.metrics.ObserveNATSPublishDuration(time.Since(start))
+	}
 
 	return nil
 }

@@ -34,6 +34,15 @@ This is a calendar notification daemon service that monitors multiple calendars 
    - Default notification intervals and severity levels
    - NATS server configuration
    - Logging configuration (JSON and text formats)
+   - Metrics endpoint configuration
+
+5. **Observability**
+   - Prometheus metrics endpoint (`pkg/metrics/`)
+   - NATS connectivity monitoring
+   - Event processing metrics
+   - Scheduler status tracking
+   - Calendar health indicators
+   - Configurable HTTP endpoint for metrics collection
 
 ## NATS Message Format
 
@@ -99,15 +108,19 @@ pkg/
   nats/                 # NATS publishing logic
   config/               # Configuration management
   scheduler/            # Event scheduling and alarm processing
+  metrics/              # Prometheus metrics collection
 internal/
   models/               # Internal data models
   logger/               # Structured logging setup
+docs/                   # Documentation
+  METRICS.md            # Prometheus metrics documentation
 examples/               # Configuration examples and helper utilities
   google-calendar-setup.md        # Google Calendar setup guide
   google-auth-helper.go           # OAuth2 authentication helper
   list-google-calendars.go        # Calendar listing utility
   config-google.yaml              # Google Calendar config example
   caldav-config.yaml              # CalDAV config example
+  config-with-metrics.yaml        # Configuration with metrics enabled
   minimal-config.yaml             # Minimal configuration
   multi-source-config.yaml        # Multi-provider example
   calendar-notifier.service       # Systemd service unit file
@@ -121,6 +134,7 @@ build/                  # Build artifacts (generated)
 - **Configuration**: `gopkg.in/yaml.v3` - YAML configuration parsing
 - **Logging**: `log/slog` (standard library) - Structured JSON and text logging
 - **OAuth2**: `golang.org/x/oauth2` - OAuth2 authentication flow for Google Calendar
+- **Prometheus**: `github.com/prometheus/client_golang` - Metrics collection and exposition
 
 ### Calendar Provider Types
 

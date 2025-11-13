@@ -5,10 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/venkytv/calendar-notifier/internal/models"
 	"github.com/venkytv/calendar-notifier/pkg/calendar"
@@ -16,6 +19,7 @@ import (
 	"github.com/venkytv/calendar-notifier/pkg/calendar/google"
 	"github.com/venkytv/calendar-notifier/pkg/calendar/providers"
 	"github.com/venkytv/calendar-notifier/pkg/config"
+	"github.com/venkytv/calendar-notifier/pkg/metrics"
 	"github.com/venkytv/calendar-notifier/pkg/nats"
 	"github.com/venkytv/calendar-notifier/pkg/scheduler"
 )
@@ -119,6 +123,8 @@ func main() {
 type App struct {
 	config           *config.Config
 	logger           *slog.Logger
+	metricsCollector *metrics.Collector
+	metricsServer    *http.Server
 	calendarManager  *calendar.Manager
 	natsPublisher    *nats.Publisher
 	eventScheduler   *scheduler.EventScheduler
@@ -142,10 +148,36 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		"config_path", configPath,
 		"dry_run", dryRun)
 
+	// Create metrics collector
+	var metricsCollector *metrics.Collector
+	var metricsServer *http.Server
+	if cfg.Metrics.Enabled {
+		metricsCollector = metrics.NewCollector(logger)
+
+		// Set up metrics HTTP server
+		metricsAddr := fmt.Sprintf("%s:%d", cfg.Metrics.Address, cfg.Metrics.Port)
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+
+		metricsServer = &http.Server{
+			Addr:    metricsAddr,
+			Handler: mux,
+		}
+
+		logger.Info("Metrics endpoint configured", "address", metricsAddr)
+	} else {
+		logger.Info("Metrics disabled")
+	}
+
 	// Create calendar manager
 	factory := calendar.NewDefaultProviderFactory()
 	providers.InitializeBuiltinProviders(factory)
 	calendarManager := calendar.NewManagerWithCoordinator(factory, nil, logger)
+
+	// Set metrics collector for calendar manager if enabled
+	if metricsCollector != nil {
+		calendarManager.SetMetrics(metricsCollector)
+	}
 
 	// Configure calendar providers
 	for _, calendarCfg := range cfg.Calendars {
@@ -222,7 +254,7 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 			URL:     cfg.NATS.URL,
 			Subject: cfg.NATS.Subject,
 		}
-		natsPublisher, err = nats.NewPublisher(natsConfig, logger)
+		natsPublisher, err = nats.NewPublisher(natsConfig, logger, metricsCollector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create NATS publisher: %w", err)
 		}
@@ -250,20 +282,32 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		publisherInterface = natsPublisher
 	}
 
-	eventScheduler := scheduler.NewEventScheduler(schedulerConfig, calendarManager, publisherInterface, logger)
+	eventScheduler := scheduler.NewEventScheduler(schedulerConfig, calendarManager, publisherInterface, logger, metricsCollector)
 
 	return &App{
-		config:          cfg,
-		logger:          logger,
-		calendarManager: calendarManager,
-		natsPublisher:   natsPublisher,
-		eventScheduler:  eventScheduler,
+		config:           cfg,
+		logger:           logger,
+		metricsCollector: metricsCollector,
+		metricsServer:    metricsServer,
+		calendarManager:  calendarManager,
+		natsPublisher:    natsPublisher,
+		eventScheduler:   eventScheduler,
 		dryRun:          dryRun,
 	}, nil
 }
 
 // Start starts the application services
 func (a *App) Start(ctx context.Context) error {
+	// Start metrics server if enabled
+	if a.metricsServer != nil {
+		go func() {
+			a.logger.Info("Starting metrics server", "address", a.metricsServer.Addr)
+			if err := a.metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				a.logger.Error("Metrics server error", "error", err)
+			}
+		}()
+	}
+
 	// Start event scheduler
 	if err := a.eventScheduler.Start(); err != nil {
 		return fmt.Errorf("failed to start event scheduler: %w", err)
@@ -280,6 +324,19 @@ func (a *App) Stop(ctx context.Context) error {
 	a.logger.Info("Shutting down application")
 
 	var shutdownErrors []error
+
+	// Stop metrics server if running
+	if a.metricsServer != nil {
+		a.logger.Info("Stopping metrics server")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := a.metricsServer.Shutdown(shutdownCtx); err != nil {
+			a.logger.Error("Error stopping metrics server", "error", err)
+			shutdownErrors = append(shutdownErrors, err)
+		} else {
+			a.logger.Info("Metrics server stopped successfully")
+		}
+	}
 
 	// Stop event scheduler first (most critical component)
 	a.logger.Info("Stopping event scheduler")

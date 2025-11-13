@@ -70,7 +70,7 @@ func TestNewEventScheduler(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	if scheduler == nil {
 		t.Fatal("Expected scheduler to be created")
@@ -94,7 +94,7 @@ func TestScheduleEventNotifications(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	// Create a test event starting in 1 hour
 	now := time.Now()
@@ -154,7 +154,7 @@ func TestScheduleEventWithoutAlarms(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(config, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(config, mockCalendarManager, mockPublisher, logger, nil)
 
 	// Create a test event without alarms
 	now := time.Now()
@@ -194,7 +194,7 @@ func TestSchedulerStats(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	// Initially no stats
 	stats := scheduler.GetStats()
@@ -237,7 +237,7 @@ func TestPastEventHandling(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	// Create a past event
 	now := time.Now()
@@ -266,7 +266,7 @@ func TestCleanupOldEvents(t *testing.T) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	now := time.Now()
 
@@ -334,7 +334,7 @@ func BenchmarkScheduleEventNotifications(b *testing.B) {
 	mockPublisher := &MockPublisher{}
 	logger := slog.Default()
 
-	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(nil, mockCalendarManager, mockPublisher, logger, nil)
 
 	now := time.Now()
 	event := &models.Event{
@@ -371,7 +371,7 @@ func TestSchedulerStartStop(t *testing.T) {
 		TimerBufferSize:     5,
 	}
 
-	scheduler := NewEventScheduler(config, mockCalendarManager, mockPublisher, logger)
+	scheduler := NewEventScheduler(config, mockCalendarManager, mockPublisher, logger, nil)
 
 	// Test starting
 	err := scheduler.Start()

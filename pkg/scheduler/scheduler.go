@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/venkytv/calendar-notifier/internal/models"
+	"github.com/venkytv/calendar-notifier/pkg/metrics"
 )
 
 // CalendarManager defines the interface for calendar management
@@ -49,6 +50,7 @@ type EventScheduler struct {
 	calendarManager CalendarManager
 	publisher       Publisher
 	logger          *slog.Logger
+	metrics         *metrics.Collector
 
 	// Internal state
 	mu               sync.RWMutex
@@ -88,7 +90,7 @@ type TimerEvent struct {
 }
 
 // NewEventScheduler creates a new event scheduler
-func NewEventScheduler(config *Config, calendarManager CalendarManager, publisher Publisher, logger *slog.Logger) *EventScheduler {
+func NewEventScheduler(config *Config, calendarManager CalendarManager, publisher Publisher, logger *slog.Logger, metricsCollector *metrics.Collector) *EventScheduler {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -104,6 +106,7 @@ func NewEventScheduler(config *Config, calendarManager CalendarManager, publishe
 		calendarManager: calendarManager,
 		publisher:       publisher,
 		logger:          logger,
+		metrics:         metricsCollector,
 		scheduledEvents: make(map[string]*ScheduledEvent),
 		upcomingTimers:  make(map[string]*time.Timer),
 		ctx:             ctx,
@@ -128,6 +131,11 @@ func (s *EventScheduler) Start() error {
 		"poll_interval", s.config.PollInterval,
 		"lookahead_window", s.config.LookaheadWindow)
 
+	// Update metrics
+	if s.metrics != nil {
+		s.metrics.SetSchedulerRunning(true)
+	}
+
 	// Start the main polling goroutine
 	s.wg.Add(1)
 	go s.pollEvents()
@@ -139,6 +147,10 @@ func (s *EventScheduler) Start() error {
 	// Start the event processing goroutine
 	s.wg.Add(1)
 	go s.processEvents()
+
+	// Start the metrics update goroutine
+	s.wg.Add(1)
+	go s.updateMetricsPeriodically()
 
 	return nil
 }
@@ -154,6 +166,11 @@ func (s *EventScheduler) Stop() error {
 
 	s.logger.Info("Stopping event scheduler")
 	s.running = false
+
+	// Update metrics
+	if s.metrics != nil {
+		s.metrics.SetSchedulerRunning(false)
+	}
 
 	// Cancel context to stop all goroutines
 	s.cancel()
@@ -251,9 +268,17 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 
 	now := time.Now()
 
+	// Track event processing
+	if s.metrics != nil {
+		s.metrics.IncEventsProcessed()
+	}
+
 	// Skip past events
 	if !event.IsUpcoming(now) {
 		s.logger.Debug("Skipping past event", "event_id", event.ID, "title", event.Title)
+		if s.metrics != nil {
+			s.metrics.IncEventsSkipped("past_event")
+		}
 		return
 	}
 
@@ -263,6 +288,9 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 			"event_id", event.ID,
 			"title", event.Title,
 			"response_status", event.ResponseStatus)
+		if s.metrics != nil {
+			s.metrics.IncEventsSkipped("not_accepted")
+		}
 		return
 	}
 
@@ -322,7 +350,15 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 	// Skip events with no alarms
 	if len(alarms) == 0 {
 		s.logger.Debug("Skipping event with no alarms", "event_id", event.ID, "title", event.Title)
+		if s.metrics != nil {
+			s.metrics.IncEventsSkipped("no_alarms")
+		}
 		return
+	}
+
+	// Track scheduled event
+	if s.metrics != nil {
+		s.metrics.IncEventsScheduled()
 	}
 
 	// Clear existing notifications for this event
@@ -522,4 +558,36 @@ func (s *EventScheduler) CleanupOldEvents() {
 	if len(toDelete) > 0 {
 		s.logger.Info("Cleaned up old events", "count", len(toDelete))
 	}
+}
+
+// updateMetricsPeriodically periodically updates metrics based on scheduler state
+func (s *EventScheduler) updateMetricsPeriodically() {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(30 * time.Second) // Update every 30 seconds
+	defer ticker.Stop()
+
+	// Initial update
+	s.updateMetrics()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.shutdownChan:
+			return
+		case <-ticker.C:
+			s.updateMetrics()
+		}
+	}
+}
+
+// updateMetrics updates metrics based on current scheduler state
+func (s *EventScheduler) updateMetrics() {
+	if s.metrics == nil {
+		return
+	}
+
+	stats := s.GetStats()
+	s.metrics.UpdateSchedulerStats(stats.TotalEvents, stats.PendingNotifications, stats.SentNotifications)
 }
