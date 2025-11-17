@@ -30,24 +30,31 @@ type Alarm struct {
 // Notification represents the message format sent to NATS
 // This matches the expected format for calendar-siren consumer
 type Notification struct {
-	Title    string    `json:"title"`
-	When     time.Time `json:"when"`
-	Lead     int       `json:"lead"`
-	Severity string    `json:"severity,omitempty"`
+	Title              string    `json:"title"`
+	When               time.Time `json:"when"`
+	Lead               int       `json:"lead"`
+	Severity           string    `json:"severity,omitempty"`
+	IsFinalNotification bool      `json:"is_final_notification,omitempty"` // True if this is the final notification (at event start time)
 }
 
 // NewNotification creates a Notification from an Event and Alarm
 func NewNotification(event *Event, alarm *Alarm) *Notification {
+	return NewNotificationWithFlags(event, alarm, false)
+}
+
+// NewNotificationWithFlags creates a Notification with additional flags
+func NewNotificationWithFlags(event *Event, alarm *Alarm, isFinalNotification bool) *Notification {
 	severity := alarm.Severity
 	if severity == "" {
 		severity = "normal"
 	}
 
 	return &Notification{
-		Title:    event.Title,
-		When:     event.StartTime,
-		Lead:     alarm.LeadTimeMinutes,
-		Severity: severity,
+		Title:              event.Title,
+		When:               event.StartTime,
+		Lead:               alarm.LeadTimeMinutes,
+		Severity:           severity,
+		IsFinalNotification: isFinalNotification,
 	}
 }
 

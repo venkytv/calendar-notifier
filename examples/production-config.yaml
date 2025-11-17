@@ -47,6 +47,10 @@ defaults:
   # Comprehensive notification intervals for different urgency levels
   notification_intervals: [5, 15, 30, 60, 120]  # 5min, 15min, 30min, 1hr, 2hr
   default_severity: "normal"
+  # Final reminder at event start time
+  final_reminder_minutes: 0
+  # Grace period for late notifications (60s default)
+  notification_grace_period: 60s
 
 # Production logging - structured and efficient
 logging:

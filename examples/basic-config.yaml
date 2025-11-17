@@ -23,9 +23,13 @@ defaults:
   default_severity: "normal"
   # Final reminder: always send a notification this many minutes before each event
   # This ensures you always get a last-minute reminder regardless of other alarms
-  # Set to 1 to get notified 1 minute before every event
+  # Set to 0 to get notified exactly at event start time
   # Omit or comment out to disable this feature
-  final_reminder_minutes: 1
+  final_reminder_minutes: 0
+  # Grace period for late notifications (allows notifications slightly in the past)
+  # Prevents missing notifications due to timing issues or clock skew
+  # Default is 60s if not specified
+  notification_grace_period: 60s
 
 # Logging configuration
 logging:

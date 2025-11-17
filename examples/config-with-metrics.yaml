@@ -26,7 +26,13 @@ defaults:
 
   # Always send a final reminder this many minutes before each event
   # This is in addition to any other alarms configured
-  final_reminder_minutes: 2
+  # Use 0 to get a notification exactly at event start time
+  final_reminder_minutes: 0
+
+  # Grace period for late notifications (allows notifications that are slightly in the past)
+  # This prevents missing notifications due to timing issues or clock skew
+  # Default is 60s if not specified
+  notification_grace_period: 60s
 
   default_severity: "normal"
 

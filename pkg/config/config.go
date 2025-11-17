@@ -38,9 +38,10 @@ type CalendarConfig struct {
 }
 
 type DefaultsConfig struct {
-	NotificationIntervals []int  `yaml:"notification_intervals"`
-	DefaultSeverity       string `yaml:"default_severity"`
-	FinalReminderMinutes  *int   `yaml:"final_reminder_minutes"` // If set, always send a notification this many minutes before each event
+	NotificationIntervals    []int         `yaml:"notification_intervals"`
+	DefaultSeverity          string        `yaml:"default_severity"`
+	FinalReminderMinutes     *int          `yaml:"final_reminder_minutes"`     // If set, always send a notification this many minutes before each event
+	NotificationGracePeriod  time.Duration `yaml:"notification_grace_period"`  // Grace period for late notifications (e.g., "60s")
 }
 
 type LoggingConfig struct {
@@ -125,6 +126,11 @@ func (c *Config) validate() error {
 
 	if c.Defaults.DefaultSeverity == "" {
 		c.Defaults.DefaultSeverity = "normal"
+	}
+
+	// Set default grace period if not specified
+	if c.Defaults.NotificationGracePeriod == 0 {
+		c.Defaults.NotificationGracePeriod = 60 * time.Second
 	}
 
 	if c.Logging.Level == "" {

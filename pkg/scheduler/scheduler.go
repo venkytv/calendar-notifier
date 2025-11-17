@@ -25,22 +25,24 @@ type Publisher interface {
 
 // Config holds the scheduler configuration
 type Config struct {
-	PollInterval        time.Duration `yaml:"poll_interval"`
-	LookaheadWindow     time.Duration `yaml:"lookahead_window"`
-	DefaultLeadTimes    []int         `yaml:"default_lead_times"` // minutes
-	FinalReminderMinutes *int         `yaml:"final_reminder_minutes"` // If set, always send this many minutes before event
-	MaxConcurrentEvents int           `yaml:"max_concurrent_events"`
-	TimerBufferSize     int           `yaml:"timer_buffer_size"`
+	PollInterval            time.Duration `yaml:"poll_interval"`
+	LookaheadWindow         time.Duration `yaml:"lookahead_window"`
+	DefaultLeadTimes        []int         `yaml:"default_lead_times"` // minutes
+	FinalReminderMinutes    *int          `yaml:"final_reminder_minutes"` // If set, always send this many minutes before event
+	NotificationGracePeriod time.Duration `yaml:"notification_grace_period"` // Grace period for late notifications
+	MaxConcurrentEvents     int           `yaml:"max_concurrent_events"`
+	TimerBufferSize         int           `yaml:"timer_buffer_size"`
 }
 
 // DefaultConfig returns a default scheduler configuration
 func DefaultConfig() *Config {
 	return &Config{
-		PollInterval:        5 * time.Minute,
-		LookaheadWindow:     24 * time.Hour,
-		DefaultLeadTimes:    []int{15, 5}, // 15 and 5 minutes before
-		MaxConcurrentEvents: 1000,
-		TimerBufferSize:     100,
+		PollInterval:            5 * time.Minute,
+		LookaheadWindow:         24 * time.Hour,
+		DefaultLeadTimes:        []int{15, 5}, // 15 and 5 minutes before
+		NotificationGracePeriod: 60 * time.Second, // Allow notifications up to 60s late
+		MaxConcurrentEvents:     1000,
+		TimerBufferSize:         100,
 	}
 }
 
@@ -371,20 +373,37 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 
 	// Schedule new notifications
 	for i, alarm := range alarms {
-		notification := models.NewNotification(event, &alarm)
+		// Determine if this is the final notification
+		isFinalNotification := false
+		if s.config.FinalReminderMinutes != nil && alarm.LeadTimeMinutes == *s.config.FinalReminderMinutes {
+			isFinalNotification = true
+		}
+
+		notification := models.NewNotificationWithFlags(event, &alarm, isFinalNotification)
 		triggerTime := event.StartTime.Add(-time.Duration(alarm.LeadTimeMinutes) * time.Minute)
 
-		// Skip notifications that should have already been sent
-		if triggerTime.Before(now) || triggerTime.Equal(now) {
-			s.logger.Debug("Skipping past notification",
+		// Skip notifications that are beyond the grace period
+		// Allow notifications that are slightly in the past (within grace period)
+		graceCutoff := now.Add(-s.config.NotificationGracePeriod)
+		if triggerTime.Before(graceCutoff) {
+			s.logger.Debug("Skipping past notification (beyond grace period)",
 				"event_id", event.ID,
 				"trigger_time", triggerTime.Format(time.RFC3339),
-				"lead_time", alarm.LeadTimeMinutes)
+				"lead_time", alarm.LeadTimeMinutes,
+				"grace_period", s.config.NotificationGracePeriod)
 			continue
 		}
 
 		// Create timer for notification
 		duration := triggerTime.Sub(now)
+		if duration < 0 {
+			// Notification is within grace period but in the past - fire immediately
+			duration = 0
+			s.logger.Debug("Notification in grace period, firing immediately",
+				"event_id", event.ID,
+				"trigger_time", triggerTime.Format(time.RFC3339),
+				"lead_time", alarm.LeadTimeMinutes)
+		}
 		notificationID := fmt.Sprintf("%s-%d", event.ID, i)
 
 		timer := time.AfterFunc(duration, func() {
