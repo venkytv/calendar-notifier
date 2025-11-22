@@ -48,6 +48,7 @@ func NewHeartbeatPublisher(conn *nats.Conn, config *config.HeartbeatConfig, logg
 
 	logger.Info("Heartbeat publisher initialized",
 		"subject_prefix", config.SubjectPrefix,
+		"service", config.Service,
 		"description", config.Description,
 		"interval", config.Interval,
 		"grace_period", config.GracePeriod)
@@ -94,7 +95,7 @@ func (h *HeartbeatPublisher) run(ctx context.Context) {
 func (h *HeartbeatPublisher) publishHeartbeat(ctx context.Context) error {
 	gracePeriod := h.config.GracePeriod
 	msg := heartbeat.Message{
-		Subject:     h.config.Description,
+		Subject:     h.config.Service,
 		GeneratedAt: time.Now(),
 		Interval:    h.config.Interval,
 		Description: h.config.Description,

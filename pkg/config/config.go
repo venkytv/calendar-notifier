@@ -25,7 +25,8 @@ type NATSConfig struct {
 type HeartbeatConfig struct {
 	Enabled      bool          `yaml:"enabled"`
 	SubjectPrefix string       `yaml:"subject_prefix"`
-	Description  string        `yaml:"description"`
+	Service      string        `yaml:"service"`      // Service name for NATS subject (e.g., "calendar-notifier")
+	Description  string        `yaml:"description"`  // Human-readable description (e.g., "Calendar Notifier")
 	Interval     time.Duration `yaml:"interval"`
 	Skippable    *int          `yaml:"skippable"`
 	GracePeriod  time.Duration `yaml:"grace_period"`
@@ -163,8 +164,11 @@ func (c *Config) validate() error {
 		if c.NATS.Heartbeat.SubjectPrefix == "" {
 			c.NATS.Heartbeat.SubjectPrefix = "heartbeat."
 		}
+		if c.NATS.Heartbeat.Service == "" {
+			c.NATS.Heartbeat.Service = "calendar-notifier"
+		}
 		if c.NATS.Heartbeat.Description == "" {
-			c.NATS.Heartbeat.Description = "calendar-notifier"
+			c.NATS.Heartbeat.Description = "Calendar Notifier"
 		}
 		if c.NATS.Heartbeat.Interval == 0 {
 			c.NATS.Heartbeat.Interval = 1 * time.Minute

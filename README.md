@@ -168,12 +168,13 @@ nats:
 
   # Optional: Heartbeat configuration for service health monitoring
   heartbeat:
-    enabled: true                   # Enable heartbeat publishing
-    subject_prefix: "heartbeat."    # Subject prefix (default: "heartbeat.")
-    description: "calendar-notifier" # Service description
-    interval: 1m                    # Heartbeat interval (default: 1m)
-    grace_period: 3m                # Grace period before alerting (default: 3x interval)
-    # skippable: 2                  # Optional: consecutive misses allowed
+    enabled: true                      # Enable heartbeat publishing
+    subject_prefix: "heartbeat."       # Subject prefix (default: "heartbeat.")
+    service: "calendar-notifier"       # Service name for NATS subject (default: "calendar-notifier")
+    description: "Calendar Notifier"   # Human-readable description (default: "Calendar Notifier")
+    interval: 1m                       # Heartbeat interval (default: 1m)
+    grace_period: 3m                   # Grace period before alerting (default: 3x interval)
+    # skippable: 2                     # Optional: consecutive misses allowed
 
 calendars:
   # Google Calendar (OAuth2)
@@ -228,9 +229,10 @@ nats:
   subject: "calendar.notifications"
   heartbeat:
     enabled: true
-    interval: 1m          # Publish every minute
-    grace_period: 3m      # Alert if no heartbeat for 3 minutes
-    description: "calendar-notifier"
+    service: "calendar-notifier"          # Service name for NATS subject
+    description: "Calendar Notifier"      # Human-readable description
+    interval: 1m                          # Publish every minute
+    grace_period: 3m                      # Alert if no heartbeat for 3 minutes
     subject_prefix: "heartbeat."
 ```
 
@@ -239,26 +241,29 @@ nats:
 nats:
   heartbeat:
     enabled: true
-    interval: 30s         # More frequent in production
-    grace_period: 2m      # Tighter grace period
-    skippable: 2          # Allow 2 consecutive misses
-    description: "calendar-notifier-prod"
+    service: "calendar-notifier-prod"           # Service name for NATS subject
+    description: "Production Calendar Notifier" # Human-readable description
+    interval: 30s                               # More frequent in production
+    grace_period: 2m                            # Tighter grace period
+    skippable: 2                                # Allow 2 consecutive misses
 ```
 
 ### Heartbeat Message Format
 
-Heartbeats are published in JSON format compatible with the [nats-heartbeat](https://github.com/venkytv/nats-heartbeat) library:
+Heartbeats are published to NATS subject `heartbeat.{service}` (e.g., `heartbeat.calendar-notifier`) with JSON payloads compatible with the [nats-heartbeat](https://github.com/venkytv/nats-heartbeat) library:
 
 ```json
 {
-  "subject": "heartbeat.calendar-notifier",
+  "subject": "calendar-notifier",
   "generated_at": "2025-11-22T21:30:00Z",
   "interval": "1m",
-  "description": "calendar-notifier",
+  "description": "Calendar Notifier",
   "grace_period": "3m",
   "skippable": 2
 }
 ```
+
+The `subject` field contains the service name (used to construct the NATS subject), while `description` contains the human-readable description.
 
 ### Monitoring
 

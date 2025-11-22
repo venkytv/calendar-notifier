@@ -9,7 +9,8 @@ nats:
   heartbeat:
     enabled: true                     # Enable heartbeat publishing
     subject_prefix: "heartbeat."      # Subject prefix for heartbeat messages (default: "heartbeat.")
-    description: "calendar-notifier"  # Service description (default: "calendar-notifier")
+    service: "calendar-notifier"      # Service name for NATS subject (default: "calendar-notifier")
+    description: "Calendar Notifier"  # Human-readable description (default: "Calendar Notifier")
     interval: 1m                      # Heartbeat interval (default: 1m)
     grace_period: 3m                  # Grace period before alerting (default: 3x interval)
     # skippable: 2                    # Optional: number of consecutive misses before alerting

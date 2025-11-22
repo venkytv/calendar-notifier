@@ -10,7 +10,8 @@ nats:
   heartbeat:
     enabled: true
     subject_prefix: "heartbeat.production."
-    description: "calendar-notifier-prod"
+    service: "calendar-notifier-prod"        # Service name for NATS subject
+    description: "Production Calendar Notifier"  # Human-readable description
     interval: 30s                     # More frequent heartbeats in production
     grace_period: 2m                  # Tighter grace period for faster alerting
     skippable: 2                      # Allow 2 consecutive misses before alerting
