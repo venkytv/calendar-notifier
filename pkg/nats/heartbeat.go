@@ -94,7 +94,7 @@ func (h *HeartbeatPublisher) run(ctx context.Context) {
 func (h *HeartbeatPublisher) publishHeartbeat(ctx context.Context) error {
 	gracePeriod := h.config.GracePeriod
 	msg := heartbeat.Message{
-		Subject:     h.config.SubjectPrefix + h.config.Description,
+		Subject:     h.config.Description,
 		GeneratedAt: time.Now(),
 		Interval:    h.config.Interval,
 		Description: h.config.Description,
