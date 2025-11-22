@@ -9,6 +9,7 @@ A Go-based calendar notification daemon that monitors multiple calendars and pub
   - **iCal**: Direct URL-based calendar feeds
   - **Google Calendar API**: Full OAuth2-based Google Calendar integration
 - **NATS Integration**: Publishes notifications in JSON format compatible with calendar-siren
+- **Heartbeat Monitoring**: Publishes periodic heartbeats to NATS for service health monitoring
 - **Flexible Scheduling**: Respects event-specific alarms or uses configurable defaults
 - **Multi-Calendar Coordination**: Deduplicates events across multiple calendar sources
 - **Graceful Shutdown**: Proper signal handling and resource cleanup
@@ -155,6 +156,8 @@ The service uses YAML configuration. See the `examples/` directory for complete 
 - `multi-source-config.yaml` - Multiple calendars with different providers
 - `config-google.yaml` - Google Calendar API configuration
 - `caldav-config.yaml` - CalDAV configuration examples
+- `config-with-metrics.yaml` - Prometheus metrics and heartbeat monitoring
+- `production-config.yaml` - Production-ready configuration with heartbeat
 
 ### Configuration Format
 
@@ -162,6 +165,15 @@ The service uses YAML configuration. See the `examples/` directory for complete 
 nats:
   url: "nats://localhost:4222"      # NATS server URL
   subject: "calendar.notifications"  # Subject to publish to
+
+  # Optional: Heartbeat configuration for service health monitoring
+  heartbeat:
+    enabled: true                   # Enable heartbeat publishing
+    subject_prefix: "heartbeat."    # Subject prefix (default: "heartbeat.")
+    description: "calendar-notifier" # Service description
+    interval: 1m                    # Heartbeat interval (default: 1m)
+    grace_period: 3m                # Grace period before alerting (default: 3x interval)
+    # skippable: 2                  # Optional: consecutive misses allowed
 
 calendars:
   # Google Calendar (OAuth2)
@@ -194,6 +206,74 @@ logging:
   level: "info"    # debug, info, warn, error
   format: "json"   # json (recommended) or text
 ```
+
+## Heartbeat Monitoring
+
+The calendar notifier can publish periodic heartbeats to NATS for service health monitoring. These heartbeats can be consumed by monitoring systems to detect service failures or unresponsiveness.
+
+### Features
+
+- **Configurable Interval**: Set how often heartbeats are published (default: 1 minute)
+- **Grace Period**: Define acceptable delay before alerting (default: 3x interval)
+- **Skippable Count**: Optionally allow N consecutive misses before alerting
+- **Automatic Subject**: Heartbeats published to `heartbeat.<description>` (e.g., `heartbeat.calendar-notifier`)
+
+### Configuration
+
+Enable heartbeat monitoring in your configuration:
+
+```yaml
+nats:
+  url: "nats://localhost:4222"
+  subject: "calendar.notifications"
+  heartbeat:
+    enabled: true
+    interval: 1m          # Publish every minute
+    grace_period: 3m      # Alert if no heartbeat for 3 minutes
+    description: "calendar-notifier"
+    subject_prefix: "heartbeat."
+```
+
+**Production Configuration Example:**
+```yaml
+nats:
+  heartbeat:
+    enabled: true
+    interval: 30s         # More frequent in production
+    grace_period: 2m      # Tighter grace period
+    skippable: 2          # Allow 2 consecutive misses
+    description: "calendar-notifier-prod"
+```
+
+### Heartbeat Message Format
+
+Heartbeats are published in JSON format compatible with the [nats-heartbeat](https://github.com/venkytv/nats-heartbeat) library:
+
+```json
+{
+  "subject": "heartbeat.calendar-notifier",
+  "generated_at": "2025-11-22T21:30:00Z",
+  "interval": "1m",
+  "description": "calendar-notifier",
+  "grace_period": "3m",
+  "skippable": 2
+}
+```
+
+### Monitoring
+
+To monitor heartbeats, you can:
+
+1. **Subscribe to heartbeat subjects:**
+   ```bash
+   nats sub "heartbeat.>"
+   ```
+
+2. **Use a monitoring tool** that consumes heartbeat messages and alerts on missed beats
+
+3. **Integrate with your existing monitoring infrastructure** (Prometheus, Grafana, etc.)
+
+See the [nats-heartbeat repository](https://github.com/venkytv/nats-heartbeat) for monitoring tools and examples.
 
 ## Troubleshooting
 
