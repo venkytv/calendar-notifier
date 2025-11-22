@@ -1,9 +1,18 @@
-# Calendar Notifier Configuration with Prometheus Metrics
-# This example shows how to enable Prometheus metrics endpoint
+# Calendar Notifier Configuration with Prometheus Metrics and Heartbeat
+# This example shows how to enable Prometheus metrics endpoint and NATS heartbeat publishing
 
 nats:
   url: "nats://localhost:4222"
   subject: "calendar.notifications"
+
+  # Heartbeat configuration for liveness monitoring
+  heartbeat:
+    enabled: true                     # Enable heartbeat publishing
+    subject_prefix: "heartbeat."      # Subject prefix for heartbeat messages (default: "heartbeat.")
+    description: "calendar-notifier"  # Service description (default: "calendar-notifier")
+    interval: 1m                      # Heartbeat interval (default: 1m)
+    grace_period: 3m                  # Grace period before alerting (default: 3x interval)
+    # skippable: 2                    # Optional: number of consecutive misses before alerting
 
 # Metrics configuration
 metrics:

@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Google Calendar OAuth2 Authentication Helper
 //
 // This tool helps complete the initial OAuth2 authentication for Google Calendar.

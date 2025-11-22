@@ -1,3 +1,5 @@
+//go:build ignore
+
 // List available Google Calendar IDs
 //
 // This tool lists all calendars accessible to your Google account

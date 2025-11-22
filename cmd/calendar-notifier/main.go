@@ -121,14 +121,15 @@ func main() {
 
 // App holds the main application components
 type App struct {
-	config           *config.Config
-	logger           *slog.Logger
-	metricsCollector *metrics.Collector
-	metricsServer    *http.Server
-	calendarManager  *calendar.Manager
-	natsPublisher    *nats.Publisher
-	eventScheduler   *scheduler.EventScheduler
-	dryRun          bool
+	config             *config.Config
+	logger             *slog.Logger
+	metricsCollector   *metrics.Collector
+	metricsServer      *http.Server
+	calendarManager    *calendar.Manager
+	natsPublisher      *nats.Publisher
+	heartbeatPublisher *nats.HeartbeatPublisher
+	eventScheduler     *scheduler.EventScheduler
+	dryRun             bool
 }
 
 // NewApp creates a new application instance
@@ -249,6 +250,7 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 
 	// Create NATS publisher (or mock for dry-run)
 	var natsPublisher *nats.Publisher
+	var heartbeatPublisher *nats.HeartbeatPublisher
 	if !dryRun {
 		natsConfig := &nats.Config{
 			URL:     cfg.NATS.URL,
@@ -257,6 +259,19 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		natsPublisher, err = nats.NewPublisher(natsConfig, logger, metricsCollector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create NATS publisher: %w", err)
+		}
+
+		// Create heartbeat publisher if enabled
+		if cfg.NATS.Heartbeat != nil && cfg.NATS.Heartbeat.Enabled {
+			// Get the underlying NATS connection from the publisher
+			// We need to access the connection, so we'll need to add a method to get it
+			heartbeatPublisher, err = nats.NewHeartbeatPublisher(natsPublisher.Connection(), cfg.NATS.Heartbeat, logger)
+			if err != nil {
+				logger.Warn("Failed to create heartbeat publisher", "error", err)
+				// Don't fail the entire application if heartbeat setup fails
+			} else {
+				logger.Info("Heartbeat publisher configured successfully")
+			}
 		}
 	} else {
 		// For dry-run, create a mock publisher that doesn't actually publish
@@ -286,14 +301,15 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 	eventScheduler := scheduler.NewEventScheduler(schedulerConfig, calendarManager, publisherInterface, logger, metricsCollector)
 
 	return &App{
-		config:           cfg,
-		logger:           logger,
-		metricsCollector: metricsCollector,
-		metricsServer:    metricsServer,
-		calendarManager:  calendarManager,
-		natsPublisher:    natsPublisher,
-		eventScheduler:   eventScheduler,
-		dryRun:          dryRun,
+		config:             cfg,
+		logger:             logger,
+		metricsCollector:   metricsCollector,
+		metricsServer:      metricsServer,
+		calendarManager:    calendarManager,
+		natsPublisher:      natsPublisher,
+		heartbeatPublisher: heartbeatPublisher,
+		eventScheduler:     eventScheduler,
+		dryRun:             dryRun,
 	}, nil
 }
 
@@ -307,6 +323,12 @@ func (a *App) Start(ctx context.Context) error {
 				a.logger.Error("Metrics server error", "error", err)
 			}
 		}()
+	}
+
+	// Start heartbeat publisher if configured
+	if a.heartbeatPublisher != nil {
+		a.heartbeatPublisher.Start(ctx)
+		a.logger.Info("Heartbeat publisher started")
 	}
 
 	// Start event scheduler
@@ -346,6 +368,17 @@ func (a *App) Stop(ctx context.Context) error {
 		shutdownErrors = append(shutdownErrors, err)
 	} else {
 		a.logger.Info("Event scheduler stopped successfully")
+	}
+
+	// Stop heartbeat publisher
+	if a.heartbeatPublisher != nil {
+		a.logger.Info("Stopping heartbeat publisher")
+		if err := a.heartbeatPublisher.Stop(); err != nil {
+			a.logger.Error("Error stopping heartbeat publisher", "error", err)
+			shutdownErrors = append(shutdownErrors, err)
+		} else {
+			a.logger.Info("Heartbeat publisher stopped successfully")
+		}
 	}
 
 	// Close NATS publisher (flush any pending messages)

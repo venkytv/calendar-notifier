@@ -320,6 +320,11 @@ func (p *Publisher) Stats() nats.Statistics {
 	return p.conn.Stats()
 }
 
+// Connection returns the underlying NATS connection
+func (p *Publisher) Connection() *nats.Conn {
+	return p.conn
+}
+
 // Close gracefully closes the NATS connection
 func (p *Publisher) Close() error {
 	if p.conn != nil && !p.conn.IsClosed() {

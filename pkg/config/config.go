@@ -17,8 +17,18 @@ type Config struct {
 }
 
 type NATSConfig struct {
-	URL     string `yaml:"url"`
-	Subject string `yaml:"subject"`
+	URL       string           `yaml:"url"`
+	Subject   string           `yaml:"subject"`
+	Heartbeat *HeartbeatConfig `yaml:"heartbeat"`
+}
+
+type HeartbeatConfig struct {
+	Enabled      bool          `yaml:"enabled"`
+	SubjectPrefix string       `yaml:"subject_prefix"`
+	Description  string        `yaml:"description"`
+	Interval     time.Duration `yaml:"interval"`
+	Skippable    *int          `yaml:"skippable"`
+	GracePeriod  time.Duration `yaml:"grace_period"`
 }
 
 type CalendarConfig struct {
@@ -146,6 +156,23 @@ func (c *Config) validate() error {
 	}
 	if c.Metrics.Port == 0 {
 		c.Metrics.Port = 9090
+	}
+
+	// Set heartbeat defaults if enabled
+	if c.NATS.Heartbeat != nil && c.NATS.Heartbeat.Enabled {
+		if c.NATS.Heartbeat.SubjectPrefix == "" {
+			c.NATS.Heartbeat.SubjectPrefix = "heartbeat."
+		}
+		if c.NATS.Heartbeat.Description == "" {
+			c.NATS.Heartbeat.Description = "calendar-notifier"
+		}
+		if c.NATS.Heartbeat.Interval == 0 {
+			c.NATS.Heartbeat.Interval = 1 * time.Minute
+		}
+		// Set grace period to 3x the interval if not specified
+		if c.NATS.Heartbeat.GracePeriod == 0 {
+			c.NATS.Heartbeat.GracePeriod = c.NATS.Heartbeat.Interval * 3
+		}
 	}
 
 	return nil

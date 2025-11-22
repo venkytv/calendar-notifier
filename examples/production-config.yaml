@@ -6,6 +6,15 @@ nats:
   url: "nats://nats1.prod.company.com:4222,nats2.prod.company.com:4222,nats3.prod.company.com:4222"
   subject: "production.calendar.notifications"
 
+  # Production heartbeat configuration for service health monitoring
+  heartbeat:
+    enabled: true
+    subject_prefix: "heartbeat.production."
+    description: "calendar-notifier-prod"
+    interval: 30s                     # More frequent heartbeats in production
+    grace_period: 2m                  # Tighter grace period for faster alerting
+    skippable: 2                      # Allow 2 consecutive misses before alerting
+
 # Production calendar sources with staggered polling
 calendars:
   # Primary corporate calendar
@@ -56,3 +65,9 @@ defaults:
 logging:
   level: "info"        # Balance between visibility and performance
   format: "json"       # Structured logs for log aggregation systems
+
+# Prometheus metrics for monitoring
+metrics:
+  enabled: true
+  address: "0.0.0.0"
+  port: 9090
