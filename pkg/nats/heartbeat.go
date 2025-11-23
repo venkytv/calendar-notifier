@@ -102,11 +102,6 @@ func (h *HeartbeatPublisher) publishHeartbeat(ctx context.Context) error {
 		GracePeriod: &gracePeriod,
 	}
 
-	// Set skippable if configured
-	if h.config.Skippable != nil {
-		msg.Skippable = h.config.Skippable
-	}
-
 	if err := h.publisher.Publish(ctx, msg); err != nil {
 		h.logger.Warn("Failed to publish heartbeat", "error", err)
 		return err

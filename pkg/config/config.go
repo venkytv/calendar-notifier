@@ -28,7 +28,6 @@ type HeartbeatConfig struct {
 	Service      string        `yaml:"service"`      // Service name for NATS subject (e.g., "calendar-notifier")
 	Description  string        `yaml:"description"`  // Human-readable description (e.g., "Calendar Notifier")
 	Interval     time.Duration `yaml:"interval"`
-	Skippable    *int          `yaml:"skippable"`
 	GracePeriod  time.Duration `yaml:"grace_period"`
 }
 

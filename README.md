@@ -216,7 +216,6 @@ The calendar notifier can publish periodic heartbeats to NATS for service health
 
 - **Configurable Interval**: Set how often heartbeats are published (default: 1 minute)
 - **Grace Period**: Define acceptable delay before alerting (default: 3x interval)
-- **Skippable Count**: Optionally allow N consecutive misses before alerting
 - **Automatic Subject**: Heartbeats published to `heartbeat.<description>` (e.g., `heartbeat.calendar-notifier`)
 
 ### Configuration
@@ -245,7 +244,6 @@ nats:
     description: "Production Calendar Notifier" # Human-readable description
     interval: 30s                               # More frequent in production
     grace_period: 2m                            # Tighter grace period
-    skippable: 2                                # Allow 2 consecutive misses
 ```
 
 ### Heartbeat Message Format
@@ -258,8 +256,7 @@ Heartbeats are published to NATS subject `heartbeat.{service}` (e.g., `heartbeat
   "generated_at": "2025-11-22T21:30:00Z",
   "interval": "1m",
   "description": "Calendar Notifier",
-  "grace_period": "3m",
-  "skippable": 2
+  "grace_period": "3m"
 }
 ```
 
