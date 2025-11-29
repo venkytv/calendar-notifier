@@ -42,7 +42,7 @@ func DefaultConfig() *Config {
 		Subject:         "calendar.notifications",
 		ConnectTimeout:  5 * time.Second,
 		ReconnectWait:   2 * time.Second,
-		MaxReconnects:   10,
+		MaxReconnects:   -1, // Unlimited reconnection attempts for daemon reliability
 		PingInterval:    2 * time.Minute,
 		MaxPingsOut:     2,
 		ReconnectBuffer: 5 * 1024 * 1024, // 5MB
