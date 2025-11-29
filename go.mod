@@ -6,7 +6,7 @@ require (
 	github.com/arran4/golang-ical v0.3.2
 	github.com/nats-io/nats.go v1.46.0
 	github.com/prometheus/client_golang v1.20.0
-	github.com/venkytv/nats-heartbeat v0.2.0
+	github.com/venkytv/nats-heartbeat v0.3.0
 	golang.org/x/oauth2 v0.32.0
 	google.golang.org/api v0.253.0
 	gopkg.in/yaml.v3 v3.0.1
