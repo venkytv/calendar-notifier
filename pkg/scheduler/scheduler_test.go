@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"testing"
 	"time"
 
@@ -325,6 +326,104 @@ func TestCleanupOldEvents(t *testing.T) {
 
 	if _, exists := scheduledEvents["old-event"]; exists {
 		t.Error("Expected old event to be removed after cleanup")
+	}
+}
+
+func TestMatchesExcludePattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		title    string
+		patterns []string
+		wantMatch bool
+	}{
+		{"exact match", "Standup", []string{"^Standup$"}, true},
+		{"case insensitive flag", "Daily STANDUP", []string{"(?i)daily standup"}, true},
+		{"case sensitive no match", "Daily STANDUP", []string{"daily standup"}, false},
+		{"substring match", "Daily Standup - Engineering", []string{"Standup"}, true},
+		{"regex alternation", "Lunch Break", []string{"Standup|Lunch"}, true},
+		{"no match", "Sprint Planning", []string{"Standup", "Lunch"}, false},
+		{"multiple patterns second matches", "Lunch Break", []string{"Standup", "Lunch"}, true},
+		{"empty patterns", "Anything", []string{}, false},
+		{"dot star", "Team sync meeting", []string{".*sync.*"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var compiled []*regexp.Regexp
+			for _, p := range tt.patterns {
+				compiled = append(compiled, regexp.MustCompile(p))
+			}
+			got := matchesExcludePattern(tt.title, compiled)
+			if (got != "") != tt.wantMatch {
+				t.Errorf("matchesExcludePattern(%q, %v) = %q, wantMatch=%v", tt.title, tt.patterns, got, tt.wantMatch)
+			}
+		})
+	}
+}
+
+func TestScheduleEventExcludePatterns(t *testing.T) {
+	config := &Config{
+		PollInterval:        1 * time.Minute,
+		LookaheadWindow:     4 * time.Hour,
+		DefaultLeadTimes:    []int{10},
+		MaxConcurrentEvents: 100,
+		TimerBufferSize:     10,
+		ExcludePatterns: map[string][]*regexp.Regexp{
+			"work": {regexp.MustCompile("Daily Standup"), regexp.MustCompile("(?i)lunch")},
+		},
+	}
+
+	mockCalendarManager := &MockCalendarManager{}
+	mockPublisher := &MockPublisher{}
+	logger := slog.Default()
+
+	s := NewEventScheduler(config, mockCalendarManager, mockPublisher, logger, nil)
+
+	now := time.Now()
+
+	// This event should be excluded
+	excluded := &models.Event{
+		ID:           "excluded-1",
+		Title:        "Daily Standup - Engineering",
+		CalendarName: "work",
+		StartTime:    now.Add(2 * time.Hour),
+		EndTime:      now.Add(3 * time.Hour),
+	}
+
+	// This event should NOT be excluded (different calendar)
+	notExcluded := &models.Event{
+		ID:           "not-excluded-1",
+		Title:        "Daily Standup - Engineering",
+		CalendarName: "personal",
+		StartTime:    now.Add(2 * time.Hour),
+		EndTime:      now.Add(3 * time.Hour),
+	}
+
+	// This event should NOT be excluded (no pattern match)
+	noMatch := &models.Event{
+		ID:           "no-match-1",
+		Title:        "Sprint Planning",
+		CalendarName: "work",
+		StartTime:    now.Add(2 * time.Hour),
+		EndTime:      now.Add(3 * time.Hour),
+	}
+
+	s.scheduleEventNotifications(excluded)
+	s.scheduleEventNotifications(notExcluded)
+	s.scheduleEventNotifications(noMatch)
+
+	events := s.GetScheduledEvents()
+	if len(events) != 2 {
+		t.Errorf("Expected 2 scheduled events, got %d", len(events))
+	}
+	if _, ok := events["excluded-1"]; ok {
+		t.Error("Expected excluded event to not be scheduled")
+	}
+	if _, ok := events["not-excluded-1"]; !ok {
+		t.Error("Expected non-excluded event to be scheduled")
+	}
+	if _, ok := events["no-match-1"]; !ok {
+		t.Error("Expected non-matching event to be scheduled")
 	}
 }
 

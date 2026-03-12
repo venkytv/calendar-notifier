@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sync"
 	"time"
 
@@ -25,13 +26,14 @@ type Publisher interface {
 
 // Config holds the scheduler configuration
 type Config struct {
-	PollInterval            time.Duration `yaml:"poll_interval"`
-	LookaheadWindow         time.Duration `yaml:"lookahead_window"`
-	DefaultLeadTimes        []int         `yaml:"default_lead_times"` // minutes
-	FinalReminderMinutes    *int          `yaml:"final_reminder_minutes"` // If set, always send this many minutes before event
-	NotificationGracePeriod time.Duration `yaml:"notification_grace_period"` // Grace period for late notifications
-	MaxConcurrentEvents     int           `yaml:"max_concurrent_events"`
-	TimerBufferSize         int           `yaml:"timer_buffer_size"`
+	PollInterval            time.Duration         `yaml:"poll_interval"`
+	LookaheadWindow         time.Duration         `yaml:"lookahead_window"`
+	DefaultLeadTimes        []int                 `yaml:"default_lead_times"` // minutes
+	FinalReminderMinutes    *int                  `yaml:"final_reminder_minutes"` // If set, always send this many minutes before event
+	NotificationGracePeriod time.Duration         `yaml:"notification_grace_period"` // Grace period for late notifications
+	MaxConcurrentEvents     int                   `yaml:"max_concurrent_events"`
+	TimerBufferSize         int                   `yaml:"timer_buffer_size"`
+	ExcludePatterns         map[string][]*regexp.Regexp // Calendar name -> compiled regexps to exclude events by title
 }
 
 // DefaultConfig returns a default scheduler configuration
@@ -294,6 +296,21 @@ func (s *EventScheduler) scheduleEventNotifications(event *models.Event) {
 			s.metrics.IncEventsSkipped("not_accepted")
 		}
 		return
+	}
+
+	// Skip events matching exclude patterns for this calendar
+	if patterns, ok := s.config.ExcludePatterns[event.CalendarName]; ok {
+		if matchedPattern := matchesExcludePattern(event.Title, patterns); matchedPattern != "" {
+			s.logger.Debug("Skipping excluded event",
+				"event_id", event.ID,
+				"title", event.Title,
+				"calendar", event.CalendarName,
+				"matched_pattern", matchedPattern)
+			if s.metrics != nil {
+				s.metrics.IncEventsSkipped("excluded_pattern")
+			}
+			return
+		}
 	}
 
 	// Get or create scheduled event
@@ -609,4 +626,15 @@ func (s *EventScheduler) updateMetrics() {
 
 	stats := s.GetStats()
 	s.metrics.UpdateSchedulerStats(stats.TotalEvents, stats.PendingNotifications, stats.SentNotifications)
+}
+
+// matchesExcludePattern checks if a title matches any of the given regexps.
+// Returns the matched pattern string, or "" if no match.
+func matchesExcludePattern(title string, patterns []*regexp.Regexp) string {
+	for _, re := range patterns {
+		if re.MatchString(title) {
+			return re.String()
+		}
+	}
+	return ""
 }

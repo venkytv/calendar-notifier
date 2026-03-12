@@ -42,6 +42,9 @@ type CalendarConfig struct {
 	Username string `yaml:"username"` // CalDAV username
 	Password string `yaml:"password"` // CalDAV password
 
+	// Event filtering
+	ExcludePatterns []string `yaml:"exclude_patterns"` // Regex patterns to exclude events by title
+
 	// Google Calendar-specific settings
 	CredentialsFile string `yaml:"credentials_file"` // Path to OAuth2 credentials JSON
 	TokenFile       string `yaml:"token_file"`       // Path to store OAuth2 tokens (optional)

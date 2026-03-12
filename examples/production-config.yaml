@@ -26,6 +26,10 @@ calendars:
     password: "${CALDAV_PASSWORD}"  # Environment variable for security
     poll_interval: "3m"
     calendar_ids: []
+    # Skip notifications for events matching these regex patterns (matched against title)
+    exclude_patterns:
+      - "(?i)FYI[:.]"           # Informational events not requiring attendance
+      - "(?i)^(OOO|Out of Office)" # Out-of-office blocks
 
   # Executive calendar with higher priority
   - name: "executive-calendar"

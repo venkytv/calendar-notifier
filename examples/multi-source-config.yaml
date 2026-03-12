@@ -23,6 +23,11 @@ calendars:
     password: "app-specific-password"
     poll_interval: "5m"
     calendar_ids: []
+    # Skip notifications for events matching these regex patterns (matched against title)
+    # Use (?i) prefix for case-insensitive matching
+    exclude_patterns:
+      - "(?i)standup"
+      - "(?i)lunch"
 
   # Shared team calendar
   - name: "team-events"

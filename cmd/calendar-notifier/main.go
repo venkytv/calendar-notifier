@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -279,6 +280,18 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		logger.Info("Running in dry-run mode - notifications will not be published")
 	}
 
+	// Build per-calendar exclude patterns map
+	excludePatterns := make(map[string][]*regexp.Regexp)
+	for _, cal := range cfg.Calendars {
+		for _, pattern := range cal.ExcludePatterns {
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return nil, fmt.Errorf("calendar %q: invalid exclude pattern %q: %w", cal.Name, pattern, err)
+			}
+			excludePatterns[cal.Name] = append(excludePatterns[cal.Name], re)
+		}
+	}
+
 	// Create scheduler configuration from app config
 	schedulerConfig := &scheduler.Config{
 		PollInterval:            5 * time.Minute, // Default - could be configurable
@@ -288,6 +301,7 @@ func NewApp(configPath string, debugMode, dryRun bool) (*App, error) {
 		NotificationGracePeriod: cfg.Defaults.NotificationGracePeriod,
 		MaxConcurrentEvents:     1000,
 		TimerBufferSize:         100,
+		ExcludePatterns:         excludePatterns,
 	}
 
 	// Create event scheduler
