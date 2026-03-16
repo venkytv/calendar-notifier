@@ -152,6 +152,36 @@ func (tm *TokenManager) SaveToken(token *oauth2.Token) error {
 	return nil
 }
 
+// persistingTokenSource wraps an oauth2.TokenSource and saves tokens to disk
+// whenever they are refreshed. This ensures that rotated refresh tokens from
+// Google are persisted, preventing "Token has been expired or revoked" errors
+// after the daemon has been running for a while.
+type persistingTokenSource struct {
+	base         oauth2.TokenSource
+	tokenManager *TokenManager
+	lastToken    *oauth2.Token
+}
+
+func (s *persistingTokenSource) Token() (*oauth2.Token, error) {
+	token, err := s.base.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to disk if the token changed (access token or refresh token rotated)
+	if s.lastToken == nil ||
+		token.AccessToken != s.lastToken.AccessToken ||
+		token.RefreshToken != s.lastToken.RefreshToken {
+		s.tokenManager.logger.Info("token refreshed, saving new token")
+		if err := s.tokenManager.SaveToken(token); err != nil {
+			s.tokenManager.logger.Warn("failed to save refreshed token", "error", err)
+		}
+		s.lastToken = token
+	}
+
+	return token, nil
+}
+
 // GetClient returns an HTTP client with a valid token, refreshing if necessary
 func (tm *TokenManager) GetClient(ctx context.Context) (*http.Client, error) {
 	token, err := tm.LoadToken()
@@ -160,20 +190,19 @@ func (tm *TokenManager) GetClient(ctx context.Context) (*http.Client, error) {
 	}
 
 	// Create token source that automatically refreshes
-	tokenSource := tm.config.TokenSource(ctx, token)
+	baseTokenSource := tm.config.TokenSource(ctx, token)
 
-	// Get fresh token (will refresh if expired)
-	freshToken, err := tokenSource.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get valid token: %w", err)
+	// Wrap with persisting token source so refreshed tokens (including
+	// rotated refresh tokens) are always saved to disk
+	tokenSource := &persistingTokenSource{
+		base:         baseTokenSource,
+		tokenManager: tm,
+		lastToken:    token,
 	}
 
-	// Save refreshed token if it changed
-	if freshToken.AccessToken != token.AccessToken {
-		tm.logger.Info("token refreshed, saving new token")
-		if err := tm.SaveToken(freshToken); err != nil {
-			tm.logger.Warn("failed to save refreshed token", "error", err)
-		}
+	// Validate that we can get a valid token
+	if _, err := tokenSource.Token(); err != nil {
+		return nil, fmt.Errorf("failed to get valid token: %w", err)
 	}
 
 	return oauth2.NewClient(ctx, tokenSource), nil
