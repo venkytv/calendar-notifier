@@ -143,6 +143,21 @@ else
     echo ""
     (cd "$SCRIPT_DIR" && go run "$AUTH_HELPER" "$CREDS_FILE" "$TOKEN_FILE")
     echo ""
-    echo "After you get the code, run:"
-    echo "  $0 <auth-code>"
+    read -rp "Paste the redirect URI from Google: " REDIRECT_URI
+
+    # Extract the authorization code from the redirect URI query string
+    AUTH_CODE=$(echo "$REDIRECT_URI" | grep -oE '([?&])code=([^&]+)' | sed 's/.*code=//' | head -1)
+
+    if [[ -z "$AUTH_CODE" ]]; then
+        echo "Error: Could not extract authorization code from URI." >&2
+        echo "Expected a URL containing a 'code=' parameter." >&2
+        exit 1
+    fi
+
+    echo ""
+    echo "Exchanging authorization code..."
+    (cd "$SCRIPT_DIR" && go run "$AUTH_HELPER" "$CREDS_FILE" "$TOKEN_FILE" "$AUTH_CODE")
+    echo ""
+    echo "Restart the service to pick up the new token:"
+    echo "  sudo systemctl restart $SERVICE_NAME"
 fi
