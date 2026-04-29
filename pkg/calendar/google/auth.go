@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -152,31 +153,41 @@ func (tm *TokenManager) SaveToken(token *oauth2.Token) error {
 	return nil
 }
 
-// persistingTokenSource wraps an oauth2.TokenSource and saves tokens to disk
-// whenever they are refreshed. This ensures that rotated refresh tokens from
-// Google are persisted, preventing "Token has been expired or revoked" errors
-// after the daemon has been running for a while.
-type persistingTokenSource struct {
-	base         oauth2.TokenSource
-	tokenManager *TokenManager
-	lastToken    *oauth2.Token
+// persistingRefresher is an oauth2.TokenSource that refreshes the access token
+// using the stored refresh token and persists the result to disk. It is meant
+// to be wrapped by oauth2.ReuseTokenSource, which handles caching and only
+// calls this source when the cached token expires.
+type persistingRefresher struct {
+	mu           sync.Mutex
+	config       *oauth2.Config
+	ctx          context.Context
+	refreshToken string
+	manager      *TokenManager
 }
 
-func (s *persistingTokenSource) Token() (*oauth2.Token, error) {
-	token, err := s.base.Token()
+func (r *persistingRefresher) Token() (*oauth2.Token, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Create a token source to perform the refresh. The token we pass has no
+	// access token, so the underlying reuseTokenSource will immediately call
+	// through to the HTTP token endpoint.
+	src := r.config.TokenSource(r.ctx, &oauth2.Token{
+		RefreshToken: r.refreshToken,
+	})
+	token, err := src.Token()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
 
-	// Save to disk if the token changed (access token or refresh token rotated)
-	if s.lastToken == nil ||
-		token.AccessToken != s.lastToken.AccessToken ||
-		token.RefreshToken != s.lastToken.RefreshToken {
-		s.tokenManager.logger.Info("token refreshed, saving new token")
-		if err := s.tokenManager.SaveToken(token); err != nil {
-			s.tokenManager.logger.Warn("failed to save refreshed token", "error", err)
-		}
-		s.lastToken = token
+	// Track refresh token rotation
+	if token.RefreshToken != "" {
+		r.refreshToken = token.RefreshToken
+	}
+
+	r.manager.logger.Info("token refreshed, persisting to disk")
+	if err := r.manager.SaveToken(token); err != nil {
+		r.manager.logger.Warn("failed to save refreshed token", "error", err)
 	}
 
 	return token, nil
@@ -189,18 +200,18 @@ func (tm *TokenManager) GetClient(ctx context.Context) (*http.Client, error) {
 		return nil, fmt.Errorf("failed to load token: %w (run initial authentication)", err)
 	}
 
-	// Create token source that automatically refreshes
-	baseTokenSource := tm.config.TokenSource(ctx, token)
-
-	// Wrap with persisting token source so refreshed tokens (including
-	// rotated refresh tokens) are always saved to disk
-	tokenSource := &persistingTokenSource{
-		base:         baseTokenSource,
-		tokenManager: tm,
-		lastToken:    token,
+	refresher := &persistingRefresher{
+		config:       tm.config,
+		ctx:          ctx,
+		refreshToken: token.RefreshToken,
+		manager:      tm,
 	}
 
-	// Validate that we can get a valid token
+	// ReuseTokenSource caches the token and only calls refresher.Token()
+	// when the cached token expires.
+	tokenSource := oauth2.ReuseTokenSource(token, refresher)
+
+	// Validate that we can get a valid token (triggers a refresh if expired)
 	if _, err := tokenSource.Token(); err != nil {
 		return nil, fmt.Errorf("failed to get valid token: %w", err)
 	}
